@@ -1,0 +1,18 @@
+Large Goal:
+A robot that can stack colored blocks into tower
+
+Step 1: Symbolic Abstraction
+- Robot sees the bblocks and understands there colored
+- "this block is red" "this block is blue"
+
+Step 2: Task Planning
+- Orginizing what needs to happen first
+- "pick up blue block, then red"
+
+Step 3: Motion Primatives
+- how to actally pick up blocks
+- "robot actually picks up a block"
+
+Step 4: Execution Loop
+- checks if it worked and if it worked move on and if it didnt try again
+
