@@ -247,21 +247,14 @@ class PlannerInterface:
     # the OMPL motion planning infrastructure above.
     # =========================================================================
 
-    def pick_up(self, block, pre_grasp_height=0.15, grasp_height=0.02):
+    def pick_up(self, block, pre_grasp_height=0.20, grasp_offset=0.08):
         """
         Pick up a block from the table or from on top of another block.
         
-        Sequence:
-            1. Plan path to pre-grasp pose above block (gripper open)
-            2. Move straight down to grasp pose
-            3. Close gripper
-            4. Attach object for collision checking
-            5. Move straight up to pre-grasp height
-        
         Args:
             block: Genesis block entity to pick up
-            pre_grasp_height: Height above block for approach (meters)
-            grasp_height: Height above block center for grasping (meters)
+            pre_grasp_height: Height above block TOP for approach (meters)
+            grasp_offset: Distance above block TOP for grasping (meters)
         
         Returns:
             bool: True if successful, False otherwise
@@ -270,11 +263,14 @@ class PlannerInterface:
             block_pos = block.get_pos()
             gs.logger.info(f"Attempting pick-up at position {block_pos}")
             
-            # 1. Plan to pre-grasp pose above block
+            BLOCK_HEIGHT = 0.04  # 4cm blocks
+            
+            # 1. Plan to pre-grasp pose ABOVE TOP of block
+            block_top_z = block_pos[2] + BLOCK_HEIGHT/2
             pre_grasp_pos = np.array([
                 block_pos[0], 
                 block_pos[1], 
-                block_pos[2] + pre_grasp_height
+                block_top_z + pre_grasp_height  # High above block
             ])
             
             qpos_pregrasp = self.robot.inverse_kinematics(
@@ -302,11 +298,11 @@ class PlannerInterface:
                 self.robot.control_dofs_position(waypoint)
                 self.scene.step()
             
-            # 2. Move straight down to grasp pose
+            # 2. Move straight down to grasp pose (just above block top)
             grasp_pos = np.array([
                 block_pos[0], 
                 block_pos[1], 
-                block_pos[2] + grasp_height
+                block_top_z + grasp_offset  # Just above top of block
             ])
             
             qpos_grasp = self.robot.inverse_kinematics(
@@ -334,7 +330,7 @@ class PlannerInterface:
             # 3. Close gripper
             gs.logger.info("Closing gripper...")
             qpos_grasp[-2:] = 0.01  # Closed position
-            for _ in range(30):
+            for _ in range(50):  # More time to grasp
                 self.robot.control_dofs_position(qpos_grasp)
                 self.scene.step()
             
@@ -356,6 +352,8 @@ class PlannerInterface:
             
         except Exception as e:
             gs.logger.error(f"Pick-up failed with exception: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def put_down(self, target_pos, place_height=0.02):
