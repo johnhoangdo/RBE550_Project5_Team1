@@ -172,7 +172,7 @@ class PlannerInterface:
             self.diagnose_bounds_violation(si, state_goal)
 
         start_valid = bool(si.isValid(state_start.get()))
-        if not start_valid:
+        if not start_in_bounds:
             gs.logger.warning(f"OMPL start state invalid")
             self.diagnose_valid_violation(state_start)
 
