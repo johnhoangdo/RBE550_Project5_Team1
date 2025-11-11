@@ -165,7 +165,8 @@ def call_planner(domain_file: str, problem_file: str,
     Strategy:
         1. Try pyperplan library API (fastest, most reliable)
         2. Try pyperplan CLI (if library fails)
-        3. Use lightweight fallback planner (if pyperplan unavailable)
+        3. Check for .soln file from CLI (FIX ADDED HERE)
+        4. Use lightweight fallback planner (if pyperplan unavailable)
 
     Args:
         domain_file: path to PDDL domain file
@@ -283,6 +284,21 @@ def call_planner(domain_file: str, problem_file: str,
         except Exception as e:
             if VERBOSE:
                 print(f"[task_planner] Pyperplan CLI failed: {e}")
+    
+    # -------------------------------------------------------------------------
+    # Strategy 2.5: Check for .soln file (FIX ADDED HERE)
+    # -------------------------------------------------------------------------
+    if plan is None:
+        # Pyperplan CLI often creates a .soln file at problem_file + ".soln"
+        soln_file = problem_file + ".soln"
+        if os.path.exists(soln_file):
+            if VERBOSE:
+                print(f"[task_planner] Found solution file: {soln_file}")
+            plan = _read_plan_file(soln_file)
+            if plan:
+                if VERBOSE:
+                    print(f"[task_planner] ✓ Read plan from {soln_file} with {len(plan)} actions")
+                return plan
     
     # -------------------------------------------------------------------------
     # Strategy 3: Use fallback planner
