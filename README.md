@@ -34,7 +34,7 @@ c) Install: pip install ompl-1.7.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2
 
 
 ...
-Pyperplan might have to be installed? (To check)
+Pyperplan might have to be installed? (To check) (pip install pyperplan)
 
 
 
