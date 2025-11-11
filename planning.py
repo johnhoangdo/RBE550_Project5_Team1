@@ -17,6 +17,7 @@ def _ensure_adapter(robot: Any, scene: Any) -> RobotAdapter:
         return robot
     return RobotAdapter(robot, scene)
 
+
 class PlannerInterface:
     def __init__(self, robot: Any, scene: Any):
         # ensure we have a RobotAdapter so the rest of the code can rely on a
@@ -238,3 +239,346 @@ class PlannerInterface:
         for i in range(self.robot.n_qs):
             tensor[i] = state[i]
         return tensor
+
+    # =========================================================================
+    # MOTION PRIMITIVES - Added for TAMP integration
+    # =========================================================================
+    # These methods implement high-level manipulation primitives using
+    # the OMPL motion planning infrastructure above.
+    # =========================================================================
+
+    def pick_up(self, block, pre_grasp_height=0.15, grasp_height=0.02):
+        """
+        Pick up a block from the table or from on top of another block.
+        
+        Sequence:
+            1. Plan path to pre-grasp pose above block (gripper open)
+            2. Move straight down to grasp pose
+            3. Close gripper
+            4. Attach object for collision checking
+            5. Move straight up to pre-grasp height
+        
+        Args:
+            block: Genesis block entity to pick up
+            pre_grasp_height: Height above block for approach (meters)
+            grasp_height: Height above block center for grasping (meters)
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            block_pos = block.get_pos()
+            gs.logger.info(f"Attempting pick-up at position {block_pos}")
+            
+            # 1. Plan to pre-grasp pose above block
+            pre_grasp_pos = np.array([
+                block_pos[0], 
+                block_pos[1], 
+                block_pos[2] + pre_grasp_height
+            ])
+            
+            qpos_pregrasp = self.robot.inverse_kinematics(
+                link=self.robot.get_link("hand"),
+                pos=pre_grasp_pos,
+                quat=np.array([0, 1, 0, 0])  # Pointing down
+            )
+            
+            if qpos_pregrasp is None:
+                gs.logger.warning("IK failed for pre-grasp pose")
+                return False
+            
+            # Set gripper to open
+            qpos_pregrasp[-2:] = 0.04
+            
+            # Plan collision-free path to pre-grasp
+            path = self.plan_path(qpos_goal=qpos_pregrasp, timeout=5.0, num_waypoints=200)
+            if not path:
+                gs.logger.warning("Failed to plan path to pre-grasp")
+                return False
+            
+            # Execute path to pre-grasp
+            gs.logger.info("Moving to pre-grasp...")
+            for waypoint in path:
+                self.robot.control_dofs_position(waypoint)
+                self.scene.step()
+            
+            # 2. Move straight down to grasp pose
+            grasp_pos = np.array([
+                block_pos[0], 
+                block_pos[1], 
+                block_pos[2] + grasp_height
+            ])
+            
+            qpos_grasp = self.robot.inverse_kinematics(
+                link=self.robot.get_link("hand"),
+                pos=grasp_pos,
+                quat=np.array([0, 1, 0, 0])
+            )
+            
+            if qpos_grasp is None:
+                gs.logger.warning("IK failed for grasp pose")
+                return False
+            
+            qpos_grasp[-2:] = 0.04  # Keep gripper open
+            
+            # Straight line interpolation down
+            gs.logger.info("Lowering to grasp...")
+            num_steps = 50
+            for i in range(num_steps + 1):
+                alpha = i / num_steps
+                waypoint = (1-alpha) * qpos_pregrasp + alpha * qpos_grasp
+                waypoint[-2:] = 0.04  # Keep gripper open
+                self.robot.control_dofs_position(waypoint)
+                self.scene.step()
+            
+            # 3. Close gripper
+            gs.logger.info("Closing gripper...")
+            qpos_grasp[-2:] = 0.01  # Closed position
+            for _ in range(30):
+                self.robot.control_dofs_position(qpos_grasp)
+                self.scene.step()
+            
+            # 4. Attach object for collision checking
+            self.attached_object = block
+            gs.logger.info(f"Attached block for collision checking")
+            
+            # 5. Lift straight up to pre-grasp height
+            gs.logger.info("Lifting...")
+            for i in range(num_steps + 1):
+                alpha = i / num_steps
+                waypoint = (1-alpha) * qpos_grasp + alpha * qpos_pregrasp
+                waypoint[-2:] = 0.01  # Keep gripper closed
+                self.robot.control_dofs_position(waypoint)
+                self.scene.step()
+            
+            gs.logger.info("Pick-up completed successfully")
+            return True
+            
+        except Exception as e:
+            gs.logger.error(f"Pick-up failed with exception: {e}")
+            return False
+
+    def put_down(self, target_pos, place_height=0.02):
+        """
+        Place the currently held object at target position.
+        
+        Sequence:
+            1. Plan path to pre-place pose above target (with attached object)
+            2. Move straight down to place pose
+            3. Open gripper
+            4. Detach object
+            5. Move straight up to pre-place height
+            6. Let physics settle
+        
+        Args:
+            target_pos: np.array [x, y, z] - target position for object center
+            place_height: Height above target z for placing (meters)
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if self.attached_object is None:
+                gs.logger.warning("No object attached to put down")
+                return False
+            
+            gs.logger.info(f"Attempting put-down at position {target_pos}")
+            
+            # 1. Plan to pre-place pose above target
+            pre_place_pos = np.array([
+                target_pos[0], 
+                target_pos[1], 
+                target_pos[2] + 0.15
+            ])
+            
+            qpos_preplace = self.robot.inverse_kinematics(
+                link=self.robot.get_link("hand"),
+                pos=pre_place_pos,
+                quat=np.array([0, 1, 0, 0])
+            )
+            
+            if qpos_preplace is None:
+                gs.logger.warning("IK failed for pre-place pose")
+                return False
+            
+            qpos_preplace[-2:] = 0.01  # Gripper closed (holding object)
+            
+            # Plan path WITH attached object for collision checking
+            path = self.plan_path(
+                qpos_goal=qpos_preplace,
+                attached_object=self.attached_object,
+                timeout=5.0,
+                num_waypoints=200
+            )
+            
+            if not path:
+                gs.logger.warning("Failed to plan path to pre-place")
+                return False
+            
+            # Execute path
+            gs.logger.info("Moving to pre-place...")
+            for waypoint in path:
+                waypoint[-2:] = 0.01  # Keep gripper closed
+                self.robot.control_dofs_position(waypoint)
+                self.scene.step()
+            
+            # 2. Lower to place position
+            place_pos = np.array([
+                target_pos[0], 
+                target_pos[1], 
+                target_pos[2] + place_height
+            ])
+            
+            qpos_place = self.robot.inverse_kinematics(
+                link=self.robot.get_link("hand"),
+                pos=place_pos,
+                quat=np.array([0, 1, 0, 0])
+            )
+            
+            if qpos_place is None:
+                gs.logger.warning("IK failed for place pose")
+                return False
+            
+            qpos_place[-2:] = 0.01  # Keep gripper closed
+            
+            # Straight line interpolation down
+            gs.logger.info("Lowering to place...")
+            num_steps = 50
+            for i in range(num_steps + 1):
+                alpha = i / num_steps
+                waypoint = (1-alpha) * qpos_preplace + alpha * qpos_place
+                waypoint[-2:] = 0.01  # Keep gripper closed
+                self.robot.control_dofs_position(waypoint)
+                self.scene.step()
+            
+            # 3. Open gripper
+            gs.logger.info("Opening gripper...")
+            qpos_place[-2:] = 0.04  # Open position
+            for _ in range(30):
+                self.robot.control_dofs_position(qpos_place)
+                self.scene.step()
+            
+            # 4. Detach object
+            self.attached_object = None
+            gs.logger.info("Detached object")
+            
+            # 5. Retract straight up
+            gs.logger.info("Retracting...")
+            for i in range(num_steps + 1):
+                alpha = i / num_steps
+                waypoint = (1-alpha) * qpos_place + alpha * qpos_preplace
+                waypoint[-2:] = 0.04  # Keep gripper open
+                self.robot.control_dofs_position(waypoint)
+                self.scene.step()
+            
+            # 6. Let physics settle
+            gs.logger.info("Letting physics settle...")
+            for _ in range(100):
+                self.scene.step()
+            
+            gs.logger.info("Put-down completed successfully")
+            return True
+            
+        except Exception as e:
+            gs.logger.error(f"Put-down failed with exception: {e}")
+            return False
+
+    def stack(self, target_block, stack_height=0.04):
+        """
+        Stack the currently held block on top of target block.
+        
+        This is essentially put_down() but with the target position
+        calculated as the top of target_block.
+        
+        Args:
+            target_block: Genesis block entity to stack on
+            stack_height: Height of one block (for stacking offset)
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if self.attached_object is None:
+                gs.logger.warning("No object attached to stack")
+                return False
+            
+            # Get target block position
+            target_pos = target_block.get_pos()
+            gs.logger.info(f"Stacking on block at {target_pos}")
+            
+            # Calculate stack position (on top of target block)
+            stack_pos = np.array([
+                target_pos[0], 
+                target_pos[1], 
+                target_pos[2] + stack_height
+            ])
+            
+            # Use put_down with adjusted height
+            return self.put_down(stack_pos, place_height=stack_height/2)
+            
+        except Exception as e:
+            gs.logger.error(f"Stack failed with exception: {e}")
+            return False
+
+    def unstack(self, block, below_block):
+        """
+        Remove a block from on top of another block.
+        
+        This is essentially the same as pick_up(), since we're picking up
+        a block that happens to be on top of another.
+        
+        Args:
+            block: Genesis block entity to unstack (top block)
+            below_block: Genesis block entity that block is on (not used directly)
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            gs.logger.info(f"Unstacking block from another block")
+            
+            # Unstack is just pick_up with the top block
+            return self.pick_up(block)
+            
+        except Exception as e:
+            gs.logger.error(f"Unstack failed with exception: {e}")
+            return False
+
+    def move_to_home(self):
+        """
+        Move robot to a home/ready position.
+        
+        Useful for:
+        - Starting position
+        - Recovery from failures
+        - Clearing workspace
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            gs.logger.info("Moving to home position...")
+            
+            # Home configuration from demo.py
+            home_qpos = np.array([0.0, -0.5, -0.2, -1.0, 0.0, 1.00, 0.5, 0.04, 0.04])
+            
+            # Clear any attached object
+            self.attached_object = None
+            
+            # Plan path to home
+            path = self.plan_path(qpos_goal=home_qpos, timeout=5.0, num_waypoints=200)
+            if not path:
+                gs.logger.warning("Failed to plan path to home")
+                return False
+            
+            # Execute path
+            for waypoint in path:
+                self.robot.control_dofs_position(waypoint)
+                self.scene.step()
+            
+            gs.logger.info("Reached home position")
+            return True
+            
+        except Exception as e:
+            gs.logger.error(f"Move to home failed: {e}")
+            return False
