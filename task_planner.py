@@ -156,16 +156,22 @@ def create_pddl_problem_file(current_state: Dict, goal_state: Dict,
 # 2) CALL EXTERNAL PLANNER (PYPERPLAN) OR FALLBACK
 # =============================================================================
 
+# FIXES FOR task_planner.py
+# Replace the call_planner function (lines 159-275) with this corrected version
+
 def call_planner(domain_file: str, problem_file: str, 
                  use_pyperplan: bool = True,
                  timeout: int = 30) -> Optional[List[Tuple]]:
     """
     Call the task planner and return a list of actions (tuples).
     
+    FIXED: Corrected pyperplan library integration and CLI handling
+    
     Strategy:
         1. Try pyperplan library API (fastest, most reliable)
-        2. Try pyperplan CLI (if library fails)
-        3. Use lightweight fallback planner (if pyperplan unavailable)
+        2. Try pyperplan CLI
+        3. Check for .soln file from CLI
+        4. Use lightweight fallback planner (if pyperplan unavailable)
 
     Args:
         domain_file: path to PDDL domain file
@@ -196,8 +202,8 @@ def call_planner(domain_file: str, problem_file: str,
             if VERBOSE:
                 print("[task_planner] Attempting to use pyperplan library...")
             
-            # Try importing and using pyperplan directly
-            from pyperplan import planner as pyplanner
+            # Try importing pyperplan
+            import pyperplan
             from pyperplan.pddl.parser import Parser
             
             # Parse domain and problem
@@ -205,8 +211,14 @@ def call_planner(domain_file: str, problem_file: str,
             domain = parser.parse_domain()
             problem = parser.parse_problem(domain)
             
-            # Run planner (pyperplan uses FF-like search by default)
-            solution = pyplanner.search(problem)
+            # FIXED: Use the correct search function
+            # pyperplan.search() is a module method, not planner.search()
+            from pyperplan import search as pyperplan_search
+            solution = pyperplan_search.breadth_first_search(problem)
+            
+            # Alternative search methods you can try:
+            # solution = pyperplan_search.greedy_best_first_search(problem, heuristic)
+            # solution = pyperplan_search.astar_search(problem, heuristic)
             
             if solution:
                 plan = _normalize_pyperplan_output(solution)
@@ -232,57 +244,79 @@ def call_planner(domain_file: str, problem_file: str,
             if VERBOSE:
                 print("[task_planner] Attempting pyperplan CLI...")
             
-            with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".plan") as tmpf:
-                tmp_plan_file = tmpf.name
+            # FIXED: Pyperplan CLI creates .soln file automatically
+            # Just run the basic command and check for output file
             
-            # Try different CLI invocations (pyperplan versions differ)
-            cli_commands = [
-                # Standard pyperplan CLI
-                f"pyperplan {shlex.quote(domain_file)} {shlex.quote(problem_file)}",
-                # With explicit output flag
-                f"pyperplan {shlex.quote(domain_file)} {shlex.quote(problem_file)} -o {shlex.quote(tmp_plan_file)}",
-                # Python module invocation
-                f"python -m pyperplan {shlex.quote(domain_file)} {shlex.quote(problem_file)}",
-            ]
+            # Try standard CLI command
+            cmd = f"pyperplan {domain_file} {problem_file}"
             
-            for cmd in cli_commands:
-                try:
-                    result = subprocess.run(
-                        shlex.split(cmd), 
-                        check=True, 
-                        stdout=subprocess.PIPE, 
-                        stderr=subprocess.PIPE,
-                        timeout=timeout
-                    )
-                    
-                    # Try to read plan from temp file
-                    plan = _read_plan_file(tmp_plan_file)
+            try:
+                result = subprocess.run(
+                    cmd.split(),
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    cwd=os.path.dirname(os.path.abspath(problem_file)) or "."
+                )
+                
+                if VERBOSE:
+                    print(f"[task_planner] Pyperplan CLI exit code: {result.returncode}")
+                    if result.stdout:
+                        print(f"[task_planner] stdout: {result.stdout[:200]}")
+                    if result.stderr:
+                        print(f"[task_planner] stderr: {result.stderr[:200]}")
+                
+                # Check for solution file (pyperplan creates problem_file.soln)
+                soln_file = problem_file + ".soln"
+                if os.path.exists(soln_file):
+                    if VERBOSE:
+                        print(f"[task_planner] Found solution file: {soln_file}")
+                    plan = _read_plan_file(soln_file)
                     if plan:
                         if VERBOSE:
-                            print(f"[task_planner] ✓ Pyperplan CLI found plan with {len(plan)} actions")
-                        os.remove(tmp_plan_file)
+                            print(f"[task_planner] ✓ Read plan from {soln_file} with {len(plan)} actions")
                         return plan
-                    
-                    # Also try parsing stdout
-                    stdout = result.stdout.decode('utf-8')
-                    if stdout and '(' in stdout:
-                        plan = _parse_plan_from_text(stdout)
-                        if plan:
-                            if VERBOSE:
-                                print(f"[task_planner] ✓ Parsed plan from stdout with {len(plan)} actions")
-                            os.remove(tmp_plan_file)
-                            return plan
                 
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-                    continue  # Try next command
+                # Also check for plan in current directory
+                problem_basename = os.path.basename(problem_file)
+                alt_soln_file = problem_basename + ".soln"
+                if os.path.exists(alt_soln_file) and alt_soln_file != soln_file:
+                    if VERBOSE:
+                        print(f"[task_planner] Found alternative solution file: {alt_soln_file}")
+                    plan = _read_plan_file(alt_soln_file)
+                    if plan:
+                        if VERBOSE:
+                            print(f"[task_planner] ✓ Read plan from {alt_soln_file} with {len(plan)} actions")
+                        return plan
             
-            # Clean up temp file
-            if os.path.exists(tmp_plan_file):
-                os.remove(tmp_plan_file)
+            except subprocess.TimeoutExpired:
+                if VERBOSE:
+                    print(f"[task_planner] Pyperplan CLI timed out after {timeout}s")
+            except FileNotFoundError:
+                if VERBOSE:
+                    print("[task_planner] Pyperplan CLI not found in PATH")
+            except Exception as e:
+                if VERBOSE:
+                    print(f"[task_planner] Pyperplan CLI error: {e}")
         
         except Exception as e:
             if VERBOSE:
                 print(f"[task_planner] Pyperplan CLI failed: {e}")
+    
+    # -------------------------------------------------------------------------
+    # Strategy 2.5: Check for .soln file one more time
+    # (in case it was created but not detected above)
+    # -------------------------------------------------------------------------
+    if plan is None:
+        soln_file = problem_file + ".soln"
+        if os.path.exists(soln_file):
+            if VERBOSE:
+                print(f"[task_planner] Found existing solution file: {soln_file}")
+            plan = _read_plan_file(soln_file)
+            if plan:
+                if VERBOSE:
+                    print(f"[task_planner] ✓ Read plan from {soln_file} with {len(plan)} actions")
+                return plan
     
     # -------------------------------------------------------------------------
     # Strategy 3: Use fallback planner
@@ -294,6 +328,11 @@ def call_planner(domain_file: str, problem_file: str,
         try:
             current_state = _parse_problem_file_init(problem_file)
             goal_state = _parse_problem_file_goal(problem_file)
+            
+            if VERBOSE:
+                print(f"[task_planner] Initial state: {len(current_state.get('ontable', []))} blocks on table")
+                print(f"[task_planner] Goal: {len(goal_state.get('on', []))} 'on' relations")
+            
             plan = _fallback_blocksworld_planner(current_state, goal_state, timeout=timeout)
             
             if plan:
@@ -306,6 +345,8 @@ def call_planner(domain_file: str, problem_file: str,
         except Exception as e:
             if VERBOSE:
                 print(f"[task_planner] ✗ Fallback planner failed: {e}")
+                import traceback
+                traceback.print_exc()
             plan = None
 
     return plan
@@ -811,7 +852,7 @@ def _fallback_blocksworld_planner(init: Dict, goal: Dict,
 def _parse_problem_file_init(problem_file: str) -> Dict:
     """
     Parse PDDL problem file to extract initial state.
-    Simple/tolerant parser for standard blocksworld format.
+    FIXED: Properly handles multi-line predicates and nested parentheses.
     """
     init = {"on": [], "ontable": [], "clear": [], "holding": [], "handempty": []}
     
@@ -821,15 +862,57 @@ def _parse_problem_file_init(problem_file: str) -> Dict:
     if "(:init" not in content:
         return init
     
-    # Extract init block
-    init_block = content.split("(:init", 1)[1].split(")", 1)[0]
-    lines = init_block.replace("\n", " ").split("(")
+    # Extract init block - FIX: Find matching closing parenthesis
+    start_idx = content.find("(:init")
+    if start_idx == -1:
+        return init
     
-    for token in lines:
-        tok = token.strip().replace(")", "").strip()
-        if not tok:
-            continue
-        parts = tok.split()
+    # Count parentheses to find the matching close
+    paren_count = 0
+    i = start_idx + 6  # Skip "(:init"
+    init_start = i
+    
+    while i < len(content):
+        if content[i] == '(':
+            paren_count += 1
+        elif content[i] == ')':
+            if paren_count == 0:
+                # Found the closing paren for (:init ...)
+                break
+            paren_count -= 1
+        i += 1
+    
+    init_block = content[init_start:i]
+    
+    # Parse predicates
+    # Split on opening parens but keep track of what we're parsing
+    predicates = []
+    current = ""
+    depth = 0
+    
+    for char in init_block:
+        if char == '(':
+            if depth == 0:
+                current = ""
+            depth += 1
+            current += char
+        elif char == ')':
+            depth -= 1
+            current += char
+            if depth == 0 and current.strip():
+                predicates.append(current.strip())
+                current = ""
+        else:
+            current += char
+    
+    # Parse each predicate
+    for pred_str in predicates:
+        # Remove outer parentheses
+        pred_str = pred_str.strip()
+        if pred_str.startswith('(') and pred_str.endswith(')'):
+            pred_str = pred_str[1:-1].strip()
+        
+        parts = pred_str.split()
         if not parts:
             continue
         
@@ -853,6 +936,7 @@ def _parse_problem_file_init(problem_file: str) -> Dict:
 def _parse_problem_file_goal(problem_file: str) -> Dict:
     """
     Parse PDDL problem file to extract goal state.
+    FIXED: Properly handles multi-line goals and nested parentheses.
     """
     goal = {"on": [], "ontable": [], "clear": []}
     
@@ -862,19 +946,73 @@ def _parse_problem_file_goal(problem_file: str) -> Dict:
     if "(:goal" not in content:
         return goal
     
-    # Extract goal block
-    goal_block = content.split("(:goal", 1)[1]
+    # Extract goal block - FIX: Find matching closing parenthesis
+    start_idx = content.find("(:goal")
+    if start_idx == -1:
+        return goal
+    
+    # Count parentheses to find the matching close
+    paren_count = 0
+    i = start_idx + 6  # Skip "(:goal"
+    goal_start = i
+    
+    while i < len(content):
+        if content[i] == '(':
+            paren_count += 1
+        elif content[i] == ')':
+            if paren_count == 0:
+                # Found the closing paren for (:goal ...)
+                break
+            paren_count -= 1
+        i += 1
+    
+    goal_block = content[goal_start:i]
+    
+    # Remove (and ...) wrapper if present
     if "(and" in goal_block:
-        goal_block = goal_block.split("(and", 1)[1]
-    goal_block = goal_block.split(")", 1)[0]
+        and_start = goal_block.find("(and")
+        if and_start != -1:
+            # Find matching close for (and ...)
+            paren_count = 0
+            j = and_start + 4
+            while j < len(goal_block):
+                if goal_block[j] == '(':
+                    paren_count += 1
+                elif goal_block[j] == ')':
+                    if paren_count == 0:
+                        break
+                    paren_count -= 1
+                j += 1
+            goal_block = goal_block[and_start + 4:j]
     
-    lines = goal_block.replace("\n", " ").split("(")
+    # Parse predicates
+    predicates = []
+    current = ""
+    depth = 0
     
-    for token in lines:
-        tok = token.strip().replace(")", "").strip()
-        if not tok:
-            continue
-        parts = tok.split()
+    for char in goal_block:
+        if char == '(':
+            if depth == 0:
+                current = ""
+            depth += 1
+            current += char
+        elif char == ')':
+            depth -= 1
+            current += char
+            if depth == 0 and current.strip():
+                predicates.append(current.strip())
+                current = ""
+        else:
+            current += char
+    
+    # Parse each predicate
+    for pred_str in predicates:
+        # Remove outer parentheses
+        pred_str = pred_str.strip()
+        if pred_str.startswith('(') and pred_str.endswith(')'):
+            pred_str = pred_str[1:-1].strip()
+        
+        parts = pred_str.split()
         if not parts:
             continue
         
@@ -889,6 +1027,7 @@ def _parse_problem_file_goal(problem_file: str) -> Dict:
             goal["clear"].append(args[0])
     
     return goal
+
 
 
 # =============================================================================
