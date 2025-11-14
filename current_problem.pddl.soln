@@ -1,0 +1,8 @@
+(pick-up m)
+(stack m c)
+(pick-up y)
+(stack y m)
+(pick-up g)
+(stack g b)
+(pick-up r)
+(stack r g)

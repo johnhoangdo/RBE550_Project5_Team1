@@ -138,6 +138,26 @@ class PlannerInterface:
         q_limit_lower = np.asarray(self.robot.q_limit[0], dtype=float)
         q_limit_upper = np.asarray(self.robot.q_limit[1], dtype=float)
 
+        # Clip start/goal joint vectors to be strictly within bounds (with
+        # a tiny epsilon) to avoid floating-point rounding causing an OMPL
+        # "out of bounds" / start-tree initialization failure. We log if
+        # clipping occurred so it's visible during debugging.
+        epsilon = 1e-9
+        clipped = False
+        qpos_start = np.asarray(qpos_start, dtype=float)
+        qpos_goal = np.asarray(qpos_goal, dtype=float)
+        qpos_start_clipped = np.clip(qpos_start, q_limit_lower + epsilon, q_limit_upper - epsilon)
+        qpos_goal_clipped = np.clip(qpos_goal, q_limit_lower + epsilon, q_limit_upper - epsilon)
+        if not np.allclose(qpos_start_clipped, qpos_start):
+            gs.logger.warning("Clipping qpos_start to satisfy joint limits (tiny epsilon applied)")
+            clipped = True
+        if not np.allclose(qpos_goal_clipped, qpos_goal):
+            gs.logger.warning("Clipping qpos_goal to satisfy joint limits (tiny epsilon applied)")
+            clipped = True
+        # Use clipped arrays from here on
+        qpos_start = qpos_start_clipped
+        qpos_goal = qpos_goal_clipped
+
         ######### setup OMPL ##########
         space = ob.RealVectorStateSpace(self.robot.n_qs)
         bounds = ob.RealVectorBounds(self.robot.n_qs)
@@ -172,7 +192,7 @@ class PlannerInterface:
             self.diagnose_bounds_violation(si, state_goal)
 
         start_valid = bool(si.isValid(state_start.get()))
-        if not start_in_bounds:
+        if not start_valid:
             gs.logger.warning(f"OMPL start state invalid")
             self.diagnose_valid_violation(state_start)
 
@@ -247,7 +267,7 @@ class PlannerInterface:
     # the OMPL motion planning infrastructure above.
     # =========================================================================
 
-    def pick_up(self, block, pre_grasp_height=0.20, grasp_offset=0.08):
+    def pick_up(self, block, pre_grasp_height=0.20, grasp_offset=0.09):
         """
         Pick up a block from the table or from on top of another block.
         
@@ -255,6 +275,8 @@ class PlannerInterface:
             block: Genesis block entity to pick up
             pre_grasp_height: Height above block TOP for approach (meters)
             grasp_offset: Distance above block TOP for grasping (meters)
+                        SMALLER = grab closer to top (lower down)
+                        LARGER = grab higher above top
         
         Returns:
             bool: True if successful, False otherwise
@@ -356,21 +378,15 @@ class PlannerInterface:
             traceback.print_exc()
             return False
 
-    def put_down(self, target_pos, place_height=0.02):
+    def put_down(self, target_pos, pre_place_height=0.20, place_offset=0.08):
         """
         Place the currently held object at target position.
         
-        Sequence:
-            1. Plan path to pre-place pose above target (with attached object)
-            2. Move straight down to place pose
-            3. Open gripper
-            4. Detach object
-            5. Move straight up to pre-place height
-            6. Let physics settle
-        
         Args:
-            target_pos: np.array [x, y, z] - target position for object center
-            place_height: Height above target z for placing (meters)
+            target_pos: np.array [x, y, z] - target CENTER position for block
+            pre_place_height: Height above target for approach (meters)
+            place_offset: Additional height above target CENTER for gripper (meters)
+                        HIGHER value = release block HIGHER (less slamming)
         
         Returns:
             bool: True if successful, False otherwise
@@ -380,13 +396,20 @@ class PlannerInterface:
                 gs.logger.warning("No object attached to put down")
                 return False
             
-            gs.logger.info(f"Attempting put-down at position {target_pos}")
+            gs.logger.info(f"Attempting put-down at target position {target_pos}")
+            
+            BLOCK_HEIGHT = 0.04  # 4cm blocks
+            
+            # Calculate where gripper should be
+            # target_pos[2] is where block CENTER should end up
+            # Gripper should be ABOVE block center by half block height + offset
+            target_gripper_z = target_pos[2] + BLOCK_HEIGHT/2 + place_offset
             
             # 1. Plan to pre-place pose above target
             pre_place_pos = np.array([
                 target_pos[0], 
                 target_pos[1], 
-                target_pos[2] + 0.15
+                target_gripper_z + pre_place_height
             ])
             
             qpos_preplace = self.robot.inverse_kinematics(
@@ -420,11 +443,11 @@ class PlannerInterface:
                 self.robot.control_dofs_position(waypoint)
                 self.scene.step()
             
-            # 2. Lower to place position
+            # 2. Lower GENTLY to place position
             place_pos = np.array([
                 target_pos[0], 
                 target_pos[1], 
-                target_pos[2] + place_height
+                target_gripper_z  # Gripper position for release
             ])
             
             qpos_place = self.robot.inverse_kinematics(
@@ -439,9 +462,9 @@ class PlannerInterface:
             
             qpos_place[-2:] = 0.01  # Keep gripper closed
             
-            # Straight line interpolation down
-            gs.logger.info("Lowering to place...")
-            num_steps = 50
+            # SLOW, GENTLE lowering
+            gs.logger.info("Lowering GENTLY to place...")
+            num_steps = 150  # Slower = gentler
             for i in range(num_steps + 1):
                 alpha = i / num_steps
                 waypoint = (1-alpha) * qpos_preplace + alpha * qpos_place
@@ -452,7 +475,7 @@ class PlannerInterface:
             # 3. Open gripper
             gs.logger.info("Opening gripper...")
             qpos_place[-2:] = 0.04  # Open position
-            for _ in range(30):
+            for _ in range(50):
                 self.robot.control_dofs_position(qpos_place)
                 self.scene.step()
             
@@ -460,7 +483,7 @@ class PlannerInterface:
             self.attached_object = None
             gs.logger.info("Detached object")
             
-            # 5. Retract straight up
+            # 5. Retract straight up SLOWLY
             gs.logger.info("Retracting...")
             for i in range(num_steps + 1):
                 alpha = i / num_steps
@@ -471,7 +494,7 @@ class PlannerInterface:
             
             # 6. Let physics settle
             gs.logger.info("Letting physics settle...")
-            for _ in range(100):
+            for _ in range(150):
                 self.scene.step()
             
             gs.logger.info("Put-down completed successfully")
@@ -479,18 +502,17 @@ class PlannerInterface:
             
         except Exception as e:
             gs.logger.error(f"Put-down failed with exception: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def stack(self, target_block, stack_height=0.04):
         """
         Stack the currently held block on top of target block.
         
-        This is essentially put_down() but with the target position
-        calculated as the top of target_block.
-        
         Args:
             target_block: Genesis block entity to stack on
-            stack_height: Height of one block (for stacking offset)
+            stack_height: Height of one block (meters) - default 0.04 for 4cm blocks
         
         Returns:
             bool: True if successful, False otherwise
@@ -500,22 +522,26 @@ class PlannerInterface:
                 gs.logger.warning("No object attached to stack")
                 return False
             
-            # Get target block position
+            # Get target block position (center of target block)
             target_pos = target_block.get_pos()
             gs.logger.info(f"Stacking on block at {target_pos}")
             
-            # Calculate stack position (on top of target block)
+            # Calculate where new block's CENTER should be
+            # target_pos[2] is center of lower block
+            # New block center = lower block center + one full block height
             stack_pos = np.array([
                 target_pos[0], 
                 target_pos[1], 
-                target_pos[2] + stack_height
+                target_pos[2] + stack_height  # One block height above center
             ])
             
-            # Use put_down with adjusted height
-            return self.put_down(stack_pos, place_height=stack_height/2)
+            # Use put_down with HIGHER offset to prevent slamming
+            return self.put_down(stack_pos, place_offset=0.08)
             
-        except Exception as e:
+        except Exception as e:  
             gs.logger.error(f"Stack failed with exception: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def unstack(self, block, below_block):

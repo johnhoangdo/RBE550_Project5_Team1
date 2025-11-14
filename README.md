@@ -1,3 +1,10 @@
+RUNNING THE ACTUAL CODE
+source venv/bin/activate //turn on virt
+python tamp_main.py
+
+
+
+
 Installation SetpsSteps to install everything so far: 
 
 1) Install conda  conda create -y -n rbe550 python=3.11
