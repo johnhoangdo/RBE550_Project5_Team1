@@ -79,9 +79,9 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             success = planner.pick_up(block)
             
             if success:
-                print(f"  ✓ Successfully picked up {block_name}")
+                print(f" Successfully picked up {block_name}")
             else:
-                print(f"  ✗ Failed to pick up {block_name}")
+                print(f" Failed to pick up {block_name}")
             
             return success
 
@@ -110,9 +110,9 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             success = planner.put_down(target_pos)
             
             if success:
-                print(f"  ✓ Successfully put down {block_name or 'block'}")
+                print(f" Successfully put down {block_name or 'block'}")
             else:
-                print(f"  ✗ Failed to put down {block_name or 'block'}")
+                print(f" Failed to put down {block_name or 'block'}")
             
             return success
 
@@ -133,7 +133,7 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             # Verify we're holding the right block
             held_obj = planner.attached_object
             if held_obj is None:
-                print(f"[WARN] Not holding {block_a_name}, trying to pick it up first...")
+                print(f"[WARN] Not holding {block_a_name}, trying to pick it up first")
                 if block_a_name in blocks_state:
                     if not planner.pick_up(blocks_state[block_a_name]):
                         print(f"[ERROR] Failed to pick up {block_a_name}")
@@ -145,15 +145,15 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             success = planner.stack(block_b)
             
             if success:
-                print(f"  ✓ Successfully stacked {block_a_name} on {block_b_name}")
+                print(f" Successfully stacked {block_a_name} on {block_b_name}")
                 
                 # Check stability
                 # Build tower from bottom up
                 tower = [block_b_name, block_a_name]
                 if not check_tower_stable(blocks_state, tower):
-                    print(f"  ⚠ Warning: Tower may be unstable!")
+                    print(f" Warning: Tower may be unstable.")
             else:
-                print(f"  ✗ Failed to stack {block_a_name} on {block_b_name}")
+                print(f" Failed to stack {block_a_name} on {block_b_name}")
             
             return success
 
@@ -175,9 +175,9 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             success = planner.pick_up(block_a)
             
             if success:
-                print(f"  ✓ Successfully unstacked {block_a_name} from {block_b_name}")
+                print(f" Successfully unstacked {block_a_name} from {block_b_name}")
             else:
-                print(f"  ✗ Failed to unstack {block_a_name}")
+                print(f" Failed to unstack {block_a_name}")
             
             return success
 
@@ -252,7 +252,7 @@ def tamp_loop(scene, robot, blocks_state,
         print("\n[STEP 2] Checking goal...")
         if goal_achieved(current_state, goal_predicates):
             print("\n" + "="*60)
-            print("✓ GOAL ACHIEVED!".center(60))
+            print(" GOAL ACHIEVED!".center(60))
             print("="*60)
             return True
 
@@ -275,7 +275,7 @@ def tamp_loop(scene, robot, blocks_state,
                            timeout=30)
         
         if not plan:
-            print("\n✗ No plan found. Unable to achieve goal.")
+            print("\n No plan found. Unable to achieve goal.")
             return False
 
         # Parse and validate plan
@@ -291,7 +291,7 @@ def tamp_loop(scene, robot, blocks_state,
         print("\n  Validating plan...")
         is_valid, error = validate_plan(plan, current_state, goal_predicates)
         if not is_valid:
-            print(f"  ⚠ Warning: Plan validation failed: {error}")
+            print(f"mWarning: Plan validation failed: {error}")
             print("  Proceeding anyway (validation may be overly strict)")
 
         # =====================================================================
@@ -316,7 +316,7 @@ def tamp_loop(scene, robot, blocks_state,
                 scene.step()
         
         if execution_failed:
-            print("\n⚠ Execution failed, replanning...")
+            print("\n Execution failed, replanning...")
             continue  # Go to next iteration
 
         # =====================================================================
@@ -342,7 +342,7 @@ def tamp_loop(scene, robot, blocks_state,
 
     # Max iterations reached
     print("\n" + "="*60)
-    print("✗ MAXIMUM ITERATIONS REACHED".center(60))
+    print(" MAXIMUM ITERATIONS REACHED".center(60))
     print("="*60)
     print(f"Failed to achieve goal after {max_iterations} iterations")
     return False
@@ -374,7 +374,7 @@ def main():
     # =========================================================================
     print("\n[INIT] Creating scene...")
     scene, franka, blocks_state = create_scene_6blocks()
-    print(f"  ✓ Scene created with {len(blocks_state)} blocks")
+    print(f" Scene created with {len(blocks_state)} blocks")
     print(f"  Blocks: {', '.join(sorted(blocks_state.keys()))}")
     
     # =========================================================================
@@ -391,7 +391,7 @@ def main():
         np.array([-87, -87, -87, -87, -12, -12, -12, -100, -100]),
         np.array([87, 87, 87, 87, 12, 12, 12, 100, 100]),
     )
-    print("  ✓ Control gains configured")
+    print(" Control gains configured")
     
     # =========================================================================
     # STEP 4: SELECT GOAL
