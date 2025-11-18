@@ -69,11 +69,11 @@ class PlannerInterface:
         Parameters
         ----------
         qpos_goal : array_like
-            The goal state.
+            Goal state
         qpos_start : None | array_like, optional
-            The start state. If None, the current state of the rigid entity will be used. Defaults to None.
+            Start state. If None, the current state of the rigid entity will be used. Defaults to None
         timeout : float, optional
-            The maximum time (in seconds) allowed for the motion planning algorithm to find a solution. Defaults to 5.0.
+            Max time (in seconds) allowed for the motion planning algorithm to find a solution. Default: 5.0s
         smooth_path : bool, optional
             Whether to smooth the path after finding a solution. Defaults to True.
         num_waypoints : int, optional
