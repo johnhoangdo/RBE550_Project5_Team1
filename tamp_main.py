@@ -426,9 +426,9 @@ def main():
     # =========================================================================
     print("\n" + "="*60)
     if success:
-        print("🎉 SUCCESS! Goal achieved!".center(60))
+        print(" SUCCESS, Goal achieved".center(60))
     else:
-        print("😞 FAILED. Goal not achieved.".center(60))
+        print(" FAILED, Goal not achieved.".center(60))
     print("="*60)
     
     return success
