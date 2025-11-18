@@ -19,8 +19,9 @@ Authors: LA, JHD, JEN
 Date: 11/10/2025
 """
 
-
+# ============================================================
 # GOAL 1: Two Towers (RED-GREEN-BLUE + YELLOW-MAGENTA-CYAN)
+# ============================================================
 GOAL_TWO_TOWERS = {
     "on": [
         ("r", "g"),
@@ -133,8 +134,10 @@ def visualize_goal(goal_dict, title="Goal Configuration"):
         print(f"  {', '.join(b.upper() for b in goal_dict['clear'])}")
     
     print('=' * 50 + '\n')
-
+    
+# ============================================================
  # USAGE EXAMPLES
+ # ============================================================
 if __name__ == "__main__":
     goal = get_goal("two_towers")
     visualize_goal(goal, "Goal: Two Towers")
