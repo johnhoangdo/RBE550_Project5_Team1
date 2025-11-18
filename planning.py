@@ -261,15 +261,12 @@ class PlannerInterface:
         return tensor
 
     # =========================================================================
-    # MOTION PRIMITIVES - Added for TAMP integration
-    # =========================================================================
-    # These methods implement high-level manipulation primitives using
-    # the OMPL motion planning infrastructure above.
+    # MOTION PRIMITIVES
     # =========================================================================
 
     def pick_up(self, block, pre_grasp_height=0.20, grasp_offset=0.09):
         """
-        Pick up a block from the table or from on top of another block.
+        Pick up a block from the table or from on top of another block
         
         Args:
             block: Genesis block entity to pick up
@@ -380,7 +377,7 @@ class PlannerInterface:
 
     def put_down(self, target_pos, pre_place_height=0.20, place_offset=0.08):
         """
-        Place the currently held object at target position.
+        Place the currently held object at target position
         
         Args:
             target_pos: np.array [x, y, z] - target CENTER position for block
@@ -508,7 +505,7 @@ class PlannerInterface:
 
     def stack(self, target_block, stack_height=0.04):
         """
-        Stack the currently held block on top of target block.
+        Stack the currently held block on top of target block
         
         Args:
             target_block: Genesis block entity to stack on
@@ -546,7 +543,7 @@ class PlannerInterface:
 
     def unstack(self, block, below_block):
         """
-        Remove a block from on top of another block.
+        Remove a block from on top of another block
         
         This is essentially the same as pick_up(), since we're picking up
         a block that happens to be on top of another.
@@ -570,12 +567,7 @@ class PlannerInterface:
 
     def move_to_home(self):
         """
-        Move robot to a home/ready position.
-        
-        Useful for:
-        - Starting position
-        - Recovery from failures
-        - Clearing workspace
+        Move robot to a home position
         
         Returns:
             bool: True if successful, False otherwise
@@ -583,7 +575,7 @@ class PlannerInterface:
         try:
             gs.logger.info("Moving to home position...")
             
-            # Home configuration from demo.py
+            # Home configuration (taken from from demo.py)
             home_qpos = np.array([0.0, -0.5, -0.2, -1.0, 0.0, 1.00, 0.5, 0.04, 0.04])
             
             # Clear any attached object
