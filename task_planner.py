@@ -3,16 +3,7 @@
 task_planner.py
 -----------------------------
 Task planner wrapper for Project 5 (TAMP).
-- Primary strategy: use pyperplan if available.
-- Fallback: a built-in simple STRIPS-like blocksworld planner.
-
-IMPROVEMENTS OVER ORIGINAL:
-  • Better pyperplan integration (supports multiple versions)
-  • Input validation (checks files exist)
-  • Timeout protection for fallback planner
-  • Better logging and error messages
-  • Plan validation utility
-  • Action name normalization
+- Primary strategy: use pyperplan if available
 
 API:
     create_pddl_problem_file(current_state, goal_state, filename="problem.pddl")
@@ -63,7 +54,7 @@ def create_pddl_problem_file(current_state: Dict, goal_state: Dict,
                              domain_name: str = "blocksworld",
                              problem_name: str = "tamp-problem") -> str:
     """
-    Write a PDDL problem file given current symbolic state and a goal specification.
+    Write a PDDL problem file given current symbolic state and a goal specification
 
     Args:
         current_state: dict with keys 'on', 'ontable', 'clear', 'holding', 'handempty'
@@ -153,19 +144,14 @@ def create_pddl_problem_file(current_state: Dict, goal_state: Dict,
 
 
 # =============================================================================
-# 2) CALL EXTERNAL PLANNER (PYPERPLAN) OR FALLBACK
+# 2) CALL EXTERNAL PLANNER (PYPERPLAN)
 # =============================================================================
-
-# FIXES FOR task_planner.py
-# Replace the call_planner function (lines 159-275) with this corrected version
 
 def call_planner(domain_file: str, problem_file: str, 
                  use_pyperplan: bool = True,
                  timeout: int = 30) -> Optional[List[Tuple]]:
     """
-    Call the task planner and return a list of actions (tuples).
-    
-    FIXED: Corrected pyperplan library integration and CLI handling
+    Call the task planner and return a list of actions (tuples)
     
     Strategy:
         1. Try pyperplan library API (fastest, most reliable)
@@ -211,19 +197,13 @@ def call_planner(domain_file: str, problem_file: str,
             domain = parser.parse_domain()
             problem = parser.parse_problem(domain)
             
-            # FIXED: Use the correct search function
-            # pyperplan.search() is a module method, not planner.search()
             from pyperplan import search as pyperplan_search
             solution = pyperplan_search.breadth_first_search(problem)
-            
-            # Alternative search methods you can try:
-            # solution = pyperplan_search.greedy_best_first_search(problem, heuristic)
-            # solution = pyperplan_search.astar_search(problem, heuristic)
-            
+                      
             if solution:
                 plan = _normalize_pyperplan_output(solution)
                 if VERBOSE:
-                    print(f"[task_planner] ✓ Pyperplan found plan with {len(plan)} actions")
+                    print(f"[task_planner] Pyperplan found plan with {len(plan)} actions")
                 return plan
             else:
                 if VERBOSE:
@@ -243,9 +223,6 @@ def call_planner(domain_file: str, problem_file: str,
         try:
             if VERBOSE:
                 print("[task_planner] Attempting pyperplan CLI...")
-            
-            # FIXED: Pyperplan CLI creates .soln file automatically
-            # Just run the basic command and check for output file
             
             # Try standard CLI command
             cmd = f"pyperplan {domain_file} {problem_file}"
@@ -274,7 +251,7 @@ def call_planner(domain_file: str, problem_file: str,
                     plan = _read_plan_file(soln_file)
                     if plan:
                         if VERBOSE:
-                            print(f"[task_planner] ✓ Read plan from {soln_file} with {len(plan)} actions")
+                            print(f"[task_planner] Read plan from {soln_file} with {len(plan)} actions")
                         return plan
                 
                 # Also check for plan in current directory
@@ -286,7 +263,7 @@ def call_planner(domain_file: str, problem_file: str,
                     plan = _read_plan_file(alt_soln_file)
                     if plan:
                         if VERBOSE:
-                            print(f"[task_planner] ✓ Read plan from {alt_soln_file} with {len(plan)} actions")
+                            print(f"[task_planner] Read plan from {alt_soln_file} with {len(plan)} actions")
                         return plan
             
             except subprocess.TimeoutExpired:
@@ -304,8 +281,7 @@ def call_planner(domain_file: str, problem_file: str,
                 print(f"[task_planner] Pyperplan CLI failed: {e}")
     
     # -------------------------------------------------------------------------
-    # Strategy 2.5: Check for .soln file one more time
-    # (in case it was created but not detected above)
+    # Check for .soln file one more time (in case it was created but not detected above)
     # -------------------------------------------------------------------------
     if plan is None:
         soln_file = problem_file + ".soln"
@@ -315,40 +291,9 @@ def call_planner(domain_file: str, problem_file: str,
             plan = _read_plan_file(soln_file)
             if plan:
                 if VERBOSE:
-                    print(f"[task_planner] ✓ Read plan from {soln_file} with {len(plan)} actions")
+                    print(f"[task_planner] Read plan from {soln_file} with {len(plan)} actions")
                 return plan
-    
-    # -------------------------------------------------------------------------
-    # Strategy 3: Use fallback planner
-    # -------------------------------------------------------------------------
-    if plan is None:
-        if VERBOSE:
-            print("[task_planner] Using fallback blocksworld planner...")
-        
-        try:
-            current_state = _parse_problem_file_init(problem_file)
-            goal_state = _parse_problem_file_goal(problem_file)
-            
-            if VERBOSE:
-                print(f"[task_planner] Initial state: {len(current_state.get('ontable', []))} blocks on table")
-                print(f"[task_planner] Goal: {len(goal_state.get('on', []))} 'on' relations")
-            
-            plan = _fallback_blocksworld_planner(current_state, goal_state, timeout=timeout)
-            
-            if plan:
-                if VERBOSE:
-                    print(f"[task_planner] ✓ Fallback planner found plan with {len(plan)} actions")
-            else:
-                if VERBOSE:
-                    print("[task_planner] ✗ Fallback planner found no solution")
-        
-        except Exception as e:
-            if VERBOSE:
-                print(f"[task_planner] ✗ Fallback planner failed: {e}")
-                import traceback
-                traceback.print_exc()
-            plan = None
-
+              
     return plan
 
 
@@ -657,433 +602,3 @@ def _normalize_pyperplan_output(plan_obj) -> List[Tuple]:
             normalized.extend(parse_plan_output([str(step)]))
     
     return normalized
-
-
-# =============================================================================
-# FALLBACK PLANNER: SIMPLE BLOCKSWORLD SOLVER
-# =============================================================================
-
-def _fallback_blocksworld_planner(init: Dict, goal: Dict, 
-                                  timeout: int = 30) -> Optional[List[Tuple]]:
-    """
-    Simple goal-regression planner for blocksworld.
-    
-    Uses basic means-ends analysis:
-    1. Process ON goals first (bottom-up tower building)
-    2. Process ONTABLE goals
-    3. Process CLEAR goals
-    
-    Args:
-        init: Initial state dictionary
-        goal: Goal state dictionary
-        timeout: Maximum planning time in seconds
-    
-    Returns:
-        List of action tuples, or None if no plan found
-    """
-    start_time = time.time()
-    state = copy.deepcopy(init)
-    plan = []
-    
-    def is_timeout():
-        return (time.time() - start_time) > timeout
-    
-    def is_on(x, y):
-        return (x, y) in state.get("on", [])
-    
-    def is_ontable(x):
-        return x in state.get("ontable", [])
-    
-    def is_clear(x):
-        return x in state.get("clear", [])
-    
-    def holding_obj():
-        h = state.get("holding", [])
-        return h[0] if h else None
-    
-    def sim_apply(action_tuple):
-        """Simulate action without modifying state."""
-        action = action_tuple[0]
-        args = action_tuple[1:]
-        _, error = _apply_action(state, action, args)
-        if error:
-            return False
-        # Actually apply if no error
-        new_state, _ = _apply_action(state, action, args)
-        state.clear()
-        state.update(new_state)
-        return True
-    
-    def achieve(predicate):
-        """Recursively achieve a goal predicate."""
-        if is_timeout():
-            return False
-        if len(plan) > MAX_FALLBACK_PLAN_LENGTH:
-            return False
-        
-        typ = predicate[0]
-        
-        if typ == "on":
-            x, y = predicate[1], predicate[2]
-            if is_on(x, y):
-                return True
-            
-            # Need to: hold x, then stack x onto y
-            # First ensure x is ready to be picked up
-            if not is_clear(x):
-                # Make x clear
-                if not achieve(("clear", x)):
-                    return False
-            
-            # Ensure y is clear
-            if not is_clear(y):
-                if not achieve(("clear", y)):
-                    return False
-            
-            # Pick up x if not holding
-            if holding_obj() != x:
-                if state.get("handempty"):
-                    # Try pick-up from table
-                    if is_ontable(x):
-                        if not sim_apply(("pick-up", x)):
-                            return False
-                        plan.append(("pick-up", x))
-                    else:
-                        # x is on something, unstack it
-                        below = None
-                        for (a, b) in state.get("on", []):
-                            if a == x:
-                                below = b
-                                break
-                        if below is None:
-                            return False
-                        if not sim_apply(("unstack", x, below)):
-                            return False
-                        plan.append(("unstack", x, below))
-                else:
-                    # Put down what we're holding
-                    cur = holding_obj()
-                    if cur:
-                        if not sim_apply(("put-down", cur)):
-                            return False
-                        plan.append(("put-down", cur))
-                    # Now pick up x
-                    if is_ontable(x):
-                        if not sim_apply(("pick-up", x)):
-                            return False
-                        plan.append(("pick-up", x))
-                    else:
-                        below = None
-                        for (a, b) in state.get("on", []):
-                            if a == x:
-                                below = b
-                                break
-                        if below is None:
-                            return False
-                        if not sim_apply(("unstack", x, below)):
-                            return False
-                        plan.append(("unstack", x, below))
-            
-            # Now stack x onto y
-            if not sim_apply(("stack", x, y)):
-                return False
-            plan.append(("stack", x, y))
-            return True
-        
-        elif typ == "ontable":
-            x = predicate[1]
-            if is_ontable(x):
-                return True
-            # Unstack x and put it down
-            below = None
-            for (a, b) in state.get("on", []):
-                if a == x:
-                    below = b
-                    break
-            if below is None:
-                return False
-            if not sim_apply(("unstack", x, below)):
-                return False
-            plan.append(("unstack", x, below))
-            if not sim_apply(("put-down", x)):
-                return False
-            plan.append(("put-down", x))
-            return True
-        
-        elif typ == "clear":
-            x = predicate[1]
-            if is_clear(x):
-                return True
-            # Remove blocks on top of x
-            for (a, b) in state.get("on", []):
-                if b == x:
-                    # Unstack a from x
-                    if not achieve(("ontable", a)):
-                        return False
-            return True
-        
-        else:
-            return False
-    
-    # Process goals in order: ON, ONTABLE, CLEAR
-    goal_list = []
-    for (a, b) in goal.get("on", []):
-        goal_list.append(("on", a, b))
-    for a in goal.get("ontable", []):
-        goal_list.append(("ontable", a))
-    for a in goal.get("clear", []):
-        goal_list.append(("clear", a))
-    
-    for g in goal_list:
-        if is_timeout():
-            if VERBOSE:
-                print(f"[task_planner] Fallback planner timed out after {timeout}s")
-            return None
-        if not achieve(g):
-            return None
-    
-    return plan
-
-
-# =============================================================================
-# HELPER FUNCTIONS: PARSE PROBLEM FILE (FOR FALLBACK)
-# =============================================================================
-
-def _parse_problem_file_init(problem_file: str) -> Dict:
-    """
-    Parse PDDL problem file to extract initial state.
-    FIXED: Properly handles multi-line predicates and nested parentheses.
-    """
-    init = {"on": [], "ontable": [], "clear": [], "holding": [], "handempty": []}
-    
-    with open(problem_file, "r") as f:
-        content = f.read()
-    
-    if "(:init" not in content:
-        return init
-    
-    # Extract init block - FIX: Find matching closing parenthesis
-    start_idx = content.find("(:init")
-    if start_idx == -1:
-        return init
-    
-    # Count parentheses to find the matching close
-    paren_count = 0
-    i = start_idx + 6  # Skip "(:init"
-    init_start = i
-    
-    while i < len(content):
-        if content[i] == '(':
-            paren_count += 1
-        elif content[i] == ')':
-            if paren_count == 0:
-                # Found the closing paren for (:init ...)
-                break
-            paren_count -= 1
-        i += 1
-    
-    init_block = content[init_start:i]
-    
-    # Parse predicates
-    # Split on opening parens but keep track of what we're parsing
-    predicates = []
-    current = ""
-    depth = 0
-    
-    for char in init_block:
-        if char == '(':
-            if depth == 0:
-                current = ""
-            depth += 1
-            current += char
-        elif char == ')':
-            depth -= 1
-            current += char
-            if depth == 0 and current.strip():
-                predicates.append(current.strip())
-                current = ""
-        else:
-            current += char
-    
-    # Parse each predicate
-    for pred_str in predicates:
-        # Remove outer parentheses
-        pred_str = pred_str.strip()
-        if pred_str.startswith('(') and pred_str.endswith(')'):
-            pred_str = pred_str[1:-1].strip()
-        
-        parts = pred_str.split()
-        if not parts:
-            continue
-        
-        pred = parts[0].lower()
-        args = parts[1:]
-        
-        if pred == "on" and len(args) >= 2:
-            init["on"].append((args[0], args[1]))
-        elif pred == "ontable" and len(args) >= 1:
-            init["ontable"].append(args[0])
-        elif pred == "clear" and len(args) >= 1:
-            init["clear"].append(args[0])
-        elif pred == "holding" and len(args) >= 1:
-            init["holding"].append(args[0])
-        elif pred == "handempty":
-            init["handempty"] = [True]
-    
-    return init
-
-
-def _parse_problem_file_goal(problem_file: str) -> Dict:
-    """
-    Parse PDDL problem file to extract goal state.
-    FIXED: Properly handles multi-line goals and nested parentheses.
-    """
-    goal = {"on": [], "ontable": [], "clear": []}
-    
-    with open(problem_file, "r") as f:
-        content = f.read()
-    
-    if "(:goal" not in content:
-        return goal
-    
-    # Extract goal block - FIX: Find matching closing parenthesis
-    start_idx = content.find("(:goal")
-    if start_idx == -1:
-        return goal
-    
-    # Count parentheses to find the matching close
-    paren_count = 0
-    i = start_idx + 6  # Skip "(:goal"
-    goal_start = i
-    
-    while i < len(content):
-        if content[i] == '(':
-            paren_count += 1
-        elif content[i] == ')':
-            if paren_count == 0:
-                # Found the closing paren for (:goal ...)
-                break
-            paren_count -= 1
-        i += 1
-    
-    goal_block = content[goal_start:i]
-    
-    # Remove (and ...) wrapper if present
-    if "(and" in goal_block:
-        and_start = goal_block.find("(and")
-        if and_start != -1:
-            # Find matching close for (and ...)
-            paren_count = 0
-            j = and_start + 4
-            while j < len(goal_block):
-                if goal_block[j] == '(':
-                    paren_count += 1
-                elif goal_block[j] == ')':
-                    if paren_count == 0:
-                        break
-                    paren_count -= 1
-                j += 1
-            goal_block = goal_block[and_start + 4:j]
-    
-    # Parse predicates
-    predicates = []
-    current = ""
-    depth = 0
-    
-    for char in goal_block:
-        if char == '(':
-            if depth == 0:
-                current = ""
-            depth += 1
-            current += char
-        elif char == ')':
-            depth -= 1
-            current += char
-            if depth == 0 and current.strip():
-                predicates.append(current.strip())
-                current = ""
-        else:
-            current += char
-    
-    # Parse each predicate
-    for pred_str in predicates:
-        # Remove outer parentheses
-        pred_str = pred_str.strip()
-        if pred_str.startswith('(') and pred_str.endswith(')'):
-            pred_str = pred_str[1:-1].strip()
-        
-        parts = pred_str.split()
-        if not parts:
-            continue
-        
-        pred = parts[0].lower()
-        args = parts[1:]
-        
-        if pred == "on" and len(args) >= 2:
-            goal["on"].append((args[0], args[1]))
-        elif pred == "ontable" and len(args) >= 1:
-            goal["ontable"].append(args[0])
-        elif pred == "clear" and len(args) >= 1:
-            goal["clear"].append(args[0])
-    
-    return goal
-
-
-
-# =============================================================================
-# DEMO / TESTING
-# =============================================================================
-
-if __name__ == "__main__":
-    print("=" * 60)
-    print("Task Planner Demo")
-    print("=" * 60)
-    
-    # Simple demo: stack r on g on b
-    initial = {
-        "on": [],
-        "ontable": ["r", "g", "b"],
-        "clear": ["r", "g", "b"],
-        "holding": [],
-        "handempty": [True]
-    }
-    
-    goal = {
-        "on": [("r", "g"), ("g", "b")],
-        "ontable": ["b"],
-        "clear": ["r"]
-    }
-    
-    # Create problem file
-    tmp_problem = "demo_problem.pddl"
-    create_pddl_problem_file(initial, goal, tmp_problem)
-    print(f"\n✓ Created problem file: {tmp_problem}")
-    
-    # Try planning (will use fallback since domain file may not exist)
-    print("\n" + "=" * 60)
-    print("Running planner...")
-    print("=" * 60)
-    
-    plan = call_planner("blocksworld_domain.pddl", tmp_problem, 
-                       use_pyperplan=False)  # Use fallback for demo
-    
-    if plan:
-        print(f"\n✓ Plan found with {len(plan)} actions:")
-        for i, action in enumerate(plan, 1):
-            print(f"  {i}. {action[0]} {' '.join(action[1:])}")
-        
-        # Validate plan
-        print("\n" + "=" * 60)
-        print("Validating plan...")
-        print("=" * 60)
-        is_valid, error = validate_plan(plan, initial, goal)
-        if is_valid:
-            print("✓ Plan is valid!")
-        else:
-            print(f"✗ Plan validation failed: {error}")
-    else:
-        print("\n✗ No plan found")
-    
-    # Clean up
-    if os.path.exists(tmp_problem):
-        os.remove(tmp_problem)
