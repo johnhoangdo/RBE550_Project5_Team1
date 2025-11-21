@@ -272,7 +272,7 @@ def tamp_loop(scene, robot, blocks_state,
         print("\n  Validating plan...")
         is_valid, error = validate_plan(plan, current_state, goal_predicates)
         if not is_valid:
-            print(f"  ⚠ Warning: Plan validation failed: {error}")
+            print(f" Warning: Plan validation failed: {error}")
             print("  Proceeding anyway (validation may be overly strict)")
 
         # =====================================================================
@@ -287,7 +287,7 @@ def tamp_loop(scene, robot, blocks_state,
             success = execute_primitive(action, planner_interface, scene, blocks_state)
             
             if not success:
-                print(f"\n✗ Action {action} failed. Will replan...")
+                print(f"\n  Action {action} failed. Will replan...")
                 execution_failed = True
                 break
             
@@ -297,7 +297,7 @@ def tamp_loop(scene, robot, blocks_state,
                 scene.step()
         
         if execution_failed:
-            print("\n⚠ Execution failed, replanning...")
+            print("\n Execution failed, replanning...")
             continue  # Go to next iteration
 
         # =====================================================================
@@ -314,7 +314,7 @@ def tamp_loop(scene, robot, blocks_state,
         
         if goal_achieved(final_state, goal_predicates):
             print("\n" + "="*60)
-            print("✓ GOAL ACHIEVED AFTER EXECUTION!".center(60))
+            print("GOAL ACHIEVED AFTER EXECUTION!".center(60))
             print("="*60)
             visualize_predicates(final_state, "Final State")
             return True
@@ -323,7 +323,7 @@ def tamp_loop(scene, robot, blocks_state,
 
     # Max iterations reached
     print("\n" + "="*60)
-    print("✗ MAXIMUM ITERATIONS REACHED".center(60))
+    print("MAXIMUM ITERATIONS REACHED".center(60))
     print("="*60)
     print(f"Failed to achieve goal after {max_iterations} iterations")
     return False
@@ -355,7 +355,7 @@ def main():
     # =========================================================================
     print("\n[INIT] Creating scene...")
     scene, franka, blocks_state = create_scene_6blocks()
-    print(f"  ✓ Scene created with {len(blocks_state)} blocks")
+    print(f"  Scene created with {len(blocks_state)} blocks")
     print(f"  Blocks: {', '.join(sorted(blocks_state.keys()))}")
     
     # =========================================================================
