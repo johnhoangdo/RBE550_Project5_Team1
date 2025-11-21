@@ -1,26 +1,7 @@
 """
-tamp_main.py (CORRECTED VERSION)
+tamp_main.py
 ----------------------------------
-Main Task and Motion Planning (TAMP) loop for Project 5:
-"Building the Two Towers" using the Franka Panda robot in Genesis.
-
-FIXES APPLIED:
-  - Correct scene initialization using create_scene_6blocks()
-  - Added control gains setup (REQUIRED)
-  - Added Genesis initialization
-  - Added timeout to planner
-  - Removed unnecessary time.sleep()
-  - Better error handling
-  - Stability checking
-
-IMPORTANT: You MUST add motion primitives to planning.py first!
-  See motion_primitives_for_planning.py for the code to add.
-
-Pipeline:
-  1. Symbolic Abstraction (lifting) → abstraction.py
-  2. Task Planning (Pyperplan / Fallback) → task_planner.py
-  3. Primitive Actions (grounding) → planning.py (PlannerInterface)
-  4. Motion Planning & Execution (OMPL) → planning.py (OMPL wrapper)
+Main Task and Motion Planning (TAMP) loop
 
 Author: LA, JHD, JEN
 Date: 11/10/2025
