@@ -79,9 +79,9 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             success = planner.pick_up(block)
             
             if success:
-                print(f"  ✓ Successfully picked up {block_name}")
+                print(f" Successfully picked up {block_name}")
             else:
-                print(f"  ✗ Failed to pick up {block_name}")
+                print(f" Failed to pick up {block_name}")
             
             return success
 
@@ -110,9 +110,9 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             success = planner.put_down(target_pos)
             
             if success:
-                print(f"  ✓ Successfully put down {block_name or 'block'}")
+                print(f" Successfully put down {block_name or 'block'}")
             else:
-                print(f"  ✗ Failed to put down {block_name or 'block'}")
+                print(f" Failed to put down {block_name or 'block'}")
             
             return success
 
@@ -145,7 +145,7 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             success = planner.stack(block_b)
             
             if success:
-                print(f"  ✓ Successfully stacked {block_a_name} on {block_b_name}")
+                print(f" Successfully stacked {block_a_name} on {block_b_name}")
                 
                 # Check stability
                 # Build tower from bottom up
@@ -153,7 +153,7 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
                 if not check_tower_stable(blocks_state, tower):
                     print(f"  ⚠ Warning: Tower may be unstable!")
             else:
-                print(f"  ✗ Failed to stack {block_a_name} on {block_b_name}")
+                print(f" Failed to stack {block_a_name} on {block_b_name}")
             
             return success
 
@@ -426,9 +426,9 @@ def main():
     # =========================================================================
     print("\n" + "="*60)
     if success:
-        print("🎉 SUCCESS! Goal achieved!".center(60))
+        print("SUCCESS! Goal achieved!".center(60))
     else:
-        print("😞 FAILED. Goal not achieved.".center(60))
+        print("FAILED. Goal not achieved.".center(60))
     print("="*60)
     
     return success
