@@ -241,11 +241,9 @@ class PlannerInterface:
         return tensor
 
     # =========================================================================
-    # MOTION PRIMITIVES - Added for TAMP integration
+    # MOTION PRIMITIVES
     # =========================================================================
-    # These methods implement high-level manipulation primitives using
-    # the OMPL motion planning infrastructure above.
-    # =========================================================================
+
 
     def pick_up(self, block, pre_grasp_height=0.15, grasp_height=0.02):
         """
