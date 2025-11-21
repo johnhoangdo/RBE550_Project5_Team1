@@ -305,7 +305,7 @@ if __name__ == "__main__":
     print(f"   GRIPPER_CLOSED = {GRIPPER_CLOSED}m")
     
     assert BLOCK_SIZE == 0.04, "BLOCK_SIZE must be 0.04m (4cm)!"
-    print("   ✓ BLOCK_SIZE correct!")
+    print("   BLOCK_SIZE correct!")
     
     # Test stacking height calculation
     print("\n2. STACKING HEIGHT TEST:")
@@ -317,7 +317,7 @@ if __name__ == "__main__":
     print(f"   Expected: z = {expected_z}m")
     
     assert abs(place_pos[2] - expected_z) < 0.001, "Stacking height calculation wrong!"
-    print("   ✓ Stacking height correct!")
+    print("   Stacking height correct!")
     
     # Test grasp height
     print("\n3. GRASP HEIGHT TEST:")
@@ -329,7 +329,7 @@ if __name__ == "__main__":
     print(f"   Expected: z = {expected_grasp_z}m")
     
     assert abs(grasp_pos[2] - expected_grasp_z) < 0.001, "Grasp height calculation wrong!"
-    print("   ✓ Grasp height correct!")
+    print("   Grasp height correct!")
     
     # Test other functions
     print("\n4. PREDICATE TESTS:")
@@ -353,13 +353,13 @@ if __name__ == "__main__":
     result = is_goal_achieved(sample_predicates, sample_goal)
     print(f"\n   Goal achieved: {result}")
     assert result == True, "Goal should be achieved!"
-    print("   ✓ Goal checking works!")
+    print("   Goal checking works!")
     
     print("\n5. PLAN VISUALIZATION TEST:")
     visualize_plan([("pick-up", "r"), ("stack", "r", "g")])
-    print("   ✓ Plan visualization works!")
+    print("   Plan visualization works!")
     
     print("\n" + "=" * 60)
     print("ALL TESTS PASSED! utils.py is consistent with abstraction.py")
-    print("Block size: 0.04m (4cm) ✓")
+    print("Block size: 0.04m (4cm) GOOD")
     print("=" * 60)
