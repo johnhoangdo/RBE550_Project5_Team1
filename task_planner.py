@@ -1,17 +1,15 @@
-# task_planner.py
 """
-task_planner.py
------------------------------
-Task planner wrapper for Project 5 (TAMP).
-- Primary strategy: use pyperplan if available
+Task planner wrapper for Project 5 (TAMP)
+
+Uses pyperplan if available, otherwise tries fallback options.
 
 API:
-    create_pddl_problem_file(current_state, goal_state, filename="problem.pddl")
-    call_planner(domain_file, problem_file, timeout=30)
-    parse_plan_output(plan)
-    validate_plan(plan, initial_state, goal_state)
+    create_pddl_problem_file() - Write PDDL problem from predicates
+    call_planner() - Run pyperplan to get plan
+    parse_plan_output() - Clean up plan format
+    validate_plan() - Check if plan actually works
 
-Expectations for predicate dicts (same shape used in abstraction.py):
+Expected predicate format (same as abstraction.py):
     {
       "on": [("r","g"), ...],
       "ontable": ["b","c", ...],
@@ -20,8 +18,7 @@ Expectations for predicate dicts (same shape used in abstraction.py):
       "handempty": [True] or []
     }
 
-Return plan format:
-    list of tuples, e.g. [('pick-up','r'), ('stack','r','g'), ('put-down','x')]
+Plan format: list of tuples like [('pick-up','r'), ('stack','r','g'), ...]
 
 Author: LA, JHD, JEN
 Date: 11/10/2025
@@ -36,49 +33,28 @@ from typing import List, Tuple, Dict, Optional
 import copy
 
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
+VERBOSE = True
+FALLBACK_TIMEOUT = 30
+MAX_FALLBACK_PLAN_LENGTH = 100
 
-VERBOSE = True  # Set to False to reduce logging
-FALLBACK_TIMEOUT = 30  # seconds - max time for fallback planner
-MAX_FALLBACK_PLAN_LENGTH = 100  # max actions in fallback plan
-
-
-# =============================================================================
-# 1) CREATE PDDL PROBLEM FILE
-# =============================================================================
 
 def create_pddl_problem_file(current_state: Dict, goal_state: Dict, 
                              filename: str = "problem.pddl",
                              domain_name: str = "blocksworld",
                              problem_name: str = "tamp-problem") -> str:
     """
-    Write a PDDL problem file given current symbolic state and a goal specification
-
-    Args:
-        current_state: dict with keys 'on', 'ontable', 'clear', 'holding', 'handempty'
-        goal_state: dict same shape but specifying goal predicates
-        filename: path to write problem file
-        domain_name: domain name used in PDDL (:domain ...)
-        problem_name: problem instance name
-
-    Returns:
-        filename written
-
-    Raises:
-        ValueError: if states are invalid or missing required keys
+    Write a PDDL problem file from current state and goal.
+    
+    Returns the filename written.
     """
-    # Validate inputs
     if not isinstance(current_state, dict):
         raise ValueError("current_state must be a dictionary")
     if not isinstance(goal_state, dict):
         raise ValueError("goal_state must be a dictionary")
     
-    # Collect object names from both current and goal states
+    # Collect all block names from both states
     objs = set()
     
-    # From current state
     for (a, b) in current_state.get("on", []):
         objs.add(a)
         objs.add(b)
@@ -89,7 +65,6 @@ def create_pddl_problem_file(current_state: Dict, goal_state: Dict,
     for a in current_state.get("holding", []):
         objs.add(a)
     
-    # From goal state
     for (a, b) in goal_state.get("on", []):
         objs.add(a)
         objs.add(b)
@@ -101,12 +76,11 @@ def create_pddl_problem_file(current_state: Dict, goal_state: Dict,
     if not objs:
         raise ValueError("No objects found in current_state or goal_state")
 
-    # Write PDDL problem file
+    # Write the file
     with open(filename, "w") as f:
         f.write(f"(define (problem {problem_name})\n")
         f.write(f"  (:domain {domain_name})\n\n")
         
-        # Objects declaration
         f.write("  (:objects\n")
         f.write("    " + " ".join(sorted(objs)) + " - block\n")
         f.write("  )\n\n")
@@ -121,7 +95,6 @@ def create_pddl_problem_file(current_state: Dict, goal_state: Dict,
             f.write(f"    (clear {a})\n")
         for a in current_state.get("holding", []):
             f.write(f"    (holding {a})\n")
-        # handempty is a boolean flag
         if current_state.get("handempty"):
             f.write("    (handempty)\n")
         f.write("  )\n\n")
@@ -143,36 +116,19 @@ def create_pddl_problem_file(current_state: Dict, goal_state: Dict,
     return filename
 
 
-# =============================================================================
-# 2) CALL EXTERNAL PLANNER (PYPERPLAN)
-# =============================================================================
-
 def call_planner(domain_file: str, problem_file: str, 
                  use_pyperplan: bool = True,
                  timeout: int = 30) -> Optional[List[Tuple]]:
     """
-    Call the task planner and return a list of actions (tuples)
+    Call task planner and return list of actions.
     
     Strategy:
-        1. Try pyperplan library API (fastest, most reliable)
+        1. Try pyperplan library API (fastest)
         2. Try pyperplan CLI
-        3. Check for .soln file from CLI
-        4. Use lightweight fallback planner (if pyperplan unavailable)
-
-    Args:
-        domain_file: path to PDDL domain file
-        problem_file: path to PDDL problem file
-        use_pyperplan: whether to attempt pyperplan (True = try it)
-        timeout: maximum time for fallback planner in seconds
-
-    Returns:
-        list of action tuples, e.g. [('pick-up','r'), ('stack','r','g'), ...]
-        or None if no plan found
-
-    Raises:
-        FileNotFoundError: if domain or problem file doesn't exist
+        3. Check for .soln file
+    
+    Returns plan as list of tuples, or None if no plan found.
     """
-    # Validate input files exist
     if not os.path.exists(domain_file):
         raise FileNotFoundError(f"Domain file not found: {domain_file}")
     if not os.path.exists(problem_file):
@@ -180,19 +136,15 @@ def call_planner(domain_file: str, problem_file: str,
     
     plan = None
     
-    # -------------------------------------------------------------------------
-    # Strategy 1: Try pyperplan library API
-    # -------------------------------------------------------------------------
+    # Try pyperplan library first
     if use_pyperplan:
         try:
             if VERBOSE:
                 print("[task_planner] Attempting to use pyperplan library...")
             
-            # Try importing pyperplan
             import pyperplan
             from pyperplan.pddl.parser import Parser
             
-            # Parse domain and problem
             parser = Parser(domain_file, problem_file)
             domain = parser.parse_domain()
             problem = parser.parse_problem(domain)
@@ -216,15 +168,12 @@ def call_planner(domain_file: str, problem_file: str,
             if VERBOSE:
                 print(f"[task_planner] Pyperplan library failed: {e}")
     
-    # -------------------------------------------------------------------------
-    # Strategy 2: Try pyperplan CLI
-    # -------------------------------------------------------------------------
+    # Try pyperplan CLI
     if use_pyperplan and plan is None:
         try:
             if VERBOSE:
                 print("[task_planner] Attempting pyperplan CLI...")
             
-            # Try standard CLI command
             cmd = f"pyperplan {domain_file} {problem_file}"
             
             try:
@@ -243,7 +192,7 @@ def call_planner(domain_file: str, problem_file: str,
                     if result.stderr:
                         print(f"[task_planner] stderr: {result.stderr[:200]}")
                 
-                # Check for solution file (pyperplan creates problem_file.soln)
+                # Check for solution file
                 soln_file = problem_file + ".soln"
                 if os.path.exists(soln_file):
                     if VERBOSE:
@@ -254,7 +203,7 @@ def call_planner(domain_file: str, problem_file: str,
                             print(f"[task_planner] Read plan from {soln_file} with {len(plan)} actions")
                         return plan
                 
-                # Also check for plan in current directory
+                # Also check current directory
                 problem_basename = os.path.basename(problem_file)
                 alt_soln_file = problem_basename + ".soln"
                 if os.path.exists(alt_soln_file) and alt_soln_file != soln_file:
@@ -280,9 +229,7 @@ def call_planner(domain_file: str, problem_file: str,
             if VERBOSE:
                 print(f"[task_planner] Pyperplan CLI failed: {e}")
     
-    # -------------------------------------------------------------------------
-    # Check for .soln file one more time (in case it was created but not detected above)
-    # -------------------------------------------------------------------------
+    # Check for .soln file one more time
     if plan is None:
         soln_file = problem_file + ".soln"
         if os.path.exists(soln_file):
@@ -297,26 +244,13 @@ def call_planner(domain_file: str, problem_file: str,
     return plan
 
 
-# =============================================================================
-# 3) PARSE/NORMALIZE PLAN OUTPUTS
-# =============================================================================
-
 def parse_plan_output(plan: List) -> List[Tuple]:
     """
-    Accept different plan formats and return uniform list of action tuples.
-
+    Convert various plan formats to uniform tuple format.
+    
     Examples:
-        input: ["(pick-up r)", "(stack r g)"]  
-        output: [('pick-up','r'), ('stack','r','g')]
-        
-        input: [('pick-up','r'), ('stack','r','g')] 
-        output: [('pick-up','r'), ('stack','r','g')]
-
-    Args:
-        plan: Plan in various formats (list of strings, tuples, etc.)
-
-    Returns:
-        Normalized list of action tuples
+        ["(pick-up r)", "(stack r g)"] -> [('pick-up','r'), ('stack','r','g')]
+        [('pick-up','r'), ('stack','r','g')] -> [('pick-up','r'), ('stack','r','g')]
     """
     if plan is None:
         return []
@@ -324,12 +258,10 @@ def parse_plan_output(plan: List) -> List[Tuple]:
     normalized = []
     for step in plan:
         if isinstance(step, tuple) or isinstance(step, list):
-            # Already in tuple/list format
             normalized.append(tuple(step))
         elif isinstance(step, str):
-            # Parse string format: "(pick-up r)" or "pick-up r"
             s = step.strip()
-            # Remove surrounding parentheses if present
+            # Remove parens if present
             if s.startswith("(") and s.endswith(")"):
                 s = s[1:-1].strip()
             # Split on whitespace and commas
@@ -340,7 +272,6 @@ def parse_plan_output(plan: List) -> List[Tuple]:
             args = [p.strip() for p in parts[1:]]
             normalized.append(tuple([action] + args))
         else:
-            # Unknown format - try converting to string
             s = str(step)
             normalized.extend(parse_plan_output([s]))
     
@@ -351,13 +282,7 @@ def normalize_action_names(plan: List[Tuple],
                            to_format: str = "hyphen") -> List[Tuple]:
     """
     Normalize action names to consistent format.
-    
-    Args:
-        plan: List of action tuples
-        to_format: "hyphen" for pick-up style, "underscore" for pick_up style
-    
-    Returns:
-        Plan with normalized action names
+    to_format can be "hyphen" (pick-up) or "underscore" (pick_up)
     """
     normalized = []
     for action_tuple in plan:
@@ -376,35 +301,18 @@ def normalize_action_names(plan: List[Tuple],
     return normalized
 
 
-# =============================================================================
-# 4) PLAN VALIDATION
-# =============================================================================
-
 def validate_plan(plan: List[Tuple], 
                   initial_state: Dict, 
                   goal_state: Dict) -> Tuple[bool, str]:
     """
-    Validate that a plan is well-formed and achieves the goal.
+    Check if plan is valid by simulating execution.
     
-    Performs simulation to check:
-    1. All actions are applicable (preconditions satisfied)
-    2. Final state satisfies goal predicates
-    3. No invalid states reached during execution
-    
-    Args:
-        plan: List of action tuples
-        initial_state: Initial predicate dictionary
-        goal_state: Goal predicate dictionary
-    
-    Returns:
-        (is_valid, error_message)
-        - is_valid: True if plan is valid
-        - error_message: Empty string if valid, error description if invalid
+    Returns (is_valid, error_message)
     """
     if not plan:
         return False, "Plan is empty"
     
-    # Simulate plan execution
+    # Simulate execution
     state = copy.deepcopy(initial_state)
     
     for i, action_tuple in enumerate(plan):
@@ -414,14 +322,13 @@ def validate_plan(plan: List[Tuple],
         action = action_tuple[0]
         args = action_tuple[1:]
         
-        # Apply action and check if it's valid
         new_state, error = _apply_action(state, action, args)
         if error:
             return False, f"Step {i} ({action} {' '.join(args)}): {error}"
         
         state = new_state
     
-    # Check if final state satisfies goal
+    # Check if we hit the goal
     for (a, b) in goal_state.get("on", []):
         if (a, b) not in state.get("on", []):
             return False, f"Goal not achieved: missing (on {a} {b})"
@@ -439,23 +346,17 @@ def validate_plan(plan: List[Tuple],
 
 def _apply_action(state: Dict, action: str, args: List[str]) -> Tuple[Dict, str]:
     """
-    Apply an action to a state and return new state or error.
-    
-    Returns:
-        (new_state, error_message)
-        - new_state: Updated state dict (or original if error)
-        - error_message: Empty if success, error description if failed
+    Apply action to state, return (new_state, error_message).
+    Error message is empty if successful.
     """
     new_state = copy.deepcopy(state)
-    
-    action = action.lower().replace("_", "-")  # Normalize
+    action = action.lower().replace("_", "-")
     
     if action == "pick-up":
         if len(args) < 1:
             return state, "pick-up requires 1 argument"
         x = args[0]
         
-        # Check preconditions
         if not new_state.get("handempty"):
             return state, "hand not empty"
         if x not in new_state.get("clear", []):
@@ -463,7 +364,6 @@ def _apply_action(state: Dict, action: str, args: List[str]) -> Tuple[Dict, str]
         if x not in new_state.get("ontable", []):
             return state, f"{x} not on table"
         
-        # Apply effects
         new_state["holding"] = [x]
         new_state["handempty"] = []
         new_state["ontable"].remove(x)
@@ -476,11 +376,9 @@ def _apply_action(state: Dict, action: str, args: List[str]) -> Tuple[Dict, str]
             return state, "put-down requires 1 argument"
         x = args[0]
         
-        # Check preconditions
         if x not in new_state.get("holding", []):
             return state, f"not holding {x}"
         
-        # Apply effects
         new_state["holding"] = []
         new_state["handempty"] = [True]
         new_state["ontable"].append(x)
@@ -493,13 +391,11 @@ def _apply_action(state: Dict, action: str, args: List[str]) -> Tuple[Dict, str]
             return state, "stack requires 2 arguments"
         x, y = args[0], args[1]
         
-        # Check preconditions
         if x not in new_state.get("holding", []):
             return state, f"not holding {x}"
         if y not in new_state.get("clear", []):
             return state, f"{y} not clear"
         
-        # Apply effects
         new_state["holding"] = []
         new_state["handempty"] = [True]
         new_state["on"].append((x, y))
@@ -513,7 +409,6 @@ def _apply_action(state: Dict, action: str, args: List[str]) -> Tuple[Dict, str]
             return state, "unstack requires 2 arguments"
         x, y = args[0], args[1]
         
-        # Check preconditions
         if not new_state.get("handempty"):
             return state, "hand not empty"
         if (x, y) not in new_state.get("on", []):
@@ -521,7 +416,6 @@ def _apply_action(state: Dict, action: str, args: List[str]) -> Tuple[Dict, str]
         if x not in new_state.get("clear", []):
             return state, f"{x} not clear"
         
-        # Apply effects
         new_state["holding"] = [x]
         new_state["handempty"] = []
         new_state["on"].remove((x, y))
@@ -534,10 +428,6 @@ def _apply_action(state: Dict, action: str, args: List[str]) -> Tuple[Dict, str]
         return state, f"unknown action: {action}"
 
 
-# =============================================================================
-# HELPER: READ PLAN FILE GENERATED BY PYPERPLAN CLI
-# =============================================================================
-
 def _read_plan_file(path: str) -> List[Tuple]:
     """Read plan from file generated by pyperplan CLI."""
     if not os.path.exists(path):
@@ -549,14 +439,13 @@ def _read_plan_file(path: str) -> List[Tuple]:
             ln = ln.strip()
             if not ln or ln.startswith(";") or ln.startswith("#"):
                 continue
-            # Parse action line
             steps.append(ln)
     
     return parse_plan_output(steps)
 
 
 def _parse_plan_from_text(text: str) -> List[Tuple]:
-    """Parse plan from text output (stdout)."""
+    """Parse plan from text output."""
     lines = text.split('\n')
     plan_lines = []
     
@@ -572,12 +461,8 @@ def _parse_plan_from_text(text: str) -> List[Tuple]:
 
 def _normalize_pyperplan_output(plan_obj) -> List[Tuple]:
     """
-    Convert pyperplan's internal plan representation to our tuple format.
-    
-    Pyperplan returns different formats depending on version:
-    - List of Action objects
-    - List of tuples
-    - List of strings
+    Convert pyperplan's plan format to our tuple format.
+    Pyperplan returns different formats depending on version.
     """
     if plan_obj is None:
         return []
@@ -585,20 +470,16 @@ def _normalize_pyperplan_output(plan_obj) -> List[Tuple]:
     normalized = []
     
     for step in plan_obj:
-        # Try to extract action name and arguments
         if hasattr(step, 'name') and hasattr(step, 'sig'):
             # Action object format
             action = step.name.lower()
             args = [str(arg) for arg in step.sig]
             normalized.append(tuple([action] + args))
         elif isinstance(step, tuple) or isinstance(step, list):
-            # Already tuple format
             normalized.append(tuple(step))
         elif isinstance(step, str):
-            # String format
             normalized.extend(parse_plan_output([step]))
         else:
-            # Try str() conversion
             normalized.extend(parse_plan_output([str(step)]))
     
     return normalized
