@@ -16,7 +16,7 @@ Quick note: We usually don't bother including "handempty" in the goal
 since the gripper should obviously be empty when we're done.
 
 Authors: LA, JHD, JEN
-Date: 11/10/2025
+Date: 12/01/2025
 """
 
 
@@ -33,9 +33,25 @@ GOAL_TWO_TOWERS = {
 }
 
 
+# ============================================================
+# GOAL 2: Five-Block Tower (MAGENTA-YELLOW-BLUE-RED-GREEN)
+# ============================================================
+GOAL_FIVE_TOWER = {
+    "on": [
+        ("m", "y"),   # magenta on yellow (top to bottom)
+        ("y", "b"),   # yellow on blue
+        ("b", "r"),   # blue on red
+        ("r", "g")    # red on green
+    ],
+    "ontable": ["g"],   # green is the base on table
+    "clear": ["m"],     # magenta is on top (clear)
+}
+
+
 def get_goal(goal_name):
     goals = {
-        "two_towers": GOAL_TWO_TOWERS,   
+        "two_towers": GOAL_TWO_TOWERS,
+        "five_tower": GOAL_FIVE_TOWER,
     }
     
     goal = goals.get(goal_name.lower())
