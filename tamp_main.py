@@ -380,12 +380,8 @@ def main():
     print("\n[INIT] Selecting goal...")
     
     # You can change the goal here
-    goal = GOAL_TWO_TOWERS
-    goal_name = "Two Towers (RGB + YMC)"
-    
-    # Or use get_goal() to select by name
-    # goal = get_goal("five_tower")
-    # goal_name = "Five Tower"
+    goal = get_goal("five_tower")  # Import get_goal from goals
+    goal_name = "Five-Block Tower (MYBRG)"
     
     print(f"  Goal: {goal_name}")
     visualize_predicates(goal, "Goal Configuration")
