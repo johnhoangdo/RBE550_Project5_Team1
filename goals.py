@@ -66,18 +66,155 @@ GOAL_SIX_TOWER = {
 
 
 
+# ============================================================
+# GOAL 4A: Tower Grid Configuration (12 Yellow Blocks)
+# ============================================================
+# Import will happen at runtime to avoid circular dependency
+def _get_grid_positions():
+    """Lazy import to get grid positions"""
+    try:
+        from abstraction import calculate_grid_positions
+        return calculate_grid_positions(
+            center=(0.50, 0.0),
+            spacing=0.10,
+            grid_shape=(3, 4)
+        )
+    except ImportError:
+        # Fallback if abstraction not available
+        return [(0.45, -0.15), (0.45, -0.05), (0.45, 0.05), (0.45, 0.15),
+                (0.50, -0.15), (0.50, -0.05), (0.50, 0.05), (0.50, 0.15),
+                (0.55, -0.15), (0.55, -0.05), (0.55, 0.05), (0.55, 0.15)]
+
+# Pattern: X T T X / T X X T / X T T X
+# Where X = empty, T = 2-block tower
+# Tower positions: indices 1, 2, 4, 7, 9, 10 (out of 0-11)
+GOAL_TOWER_GRID = {
+    """
+    Goal 4A: Tower Grid Configuration
+    
+    Create 6 two-block towers arranged in specific 3×4 grid pattern.
+    Uses 12 yellow blocks (y1-y12).
+    
+    Pattern visualization:
+    Row 1:  Empty  Tower  Tower  Empty
+    Row 2:  Tower  Empty  Empty  Tower
+    Row 3:  Empty  Tower  Tower  Empty
+    """
+    "on": [
+        # 6 towers, each 2 blocks high
+        ("y1", "y7"),   # Tower at grid position 1
+        ("y2", "y8"),   # Tower at grid position 2
+        ("y3", "y9"),   # Tower at grid position 4
+        ("y4", "y10"),  # Tower at grid position 7
+        ("y5", "y11"),  # Tower at grid position 9
+        ("y6", "y12"),  # Tower at grid position 10
+    ],
+    "ontable": ["y7", "y8", "y9", "y10", "y11", "y12"],  # Base blocks
+    "clear": ["y1", "y2", "y3", "y4", "y5", "y6"],      # Top blocks
+    
+    # Spatial constraints (loaded dynamically)
+    # Will be populated when goal is retrieved
+}
+
+# ============================================================
+# GOAL 4B: Adjacent Configuration (3 Red + 3 Green)
+# ============================================================
+def _get_2x2_positions():
+    """Lazy import to get 2×2 grid positions"""
+    try:
+        from abstraction import calculate_2x2_grid_positions
+        return calculate_2x2_grid_positions(
+            center=(0.525, 0.0),
+            spacing=0.15
+        )
+    except ImportError:
+        # Fallback
+        return [(0.45, -0.075), (0.45, 0.075), 
+                (0.60, -0.075), (0.60, 0.075)]
+
+GOAL_ADJACENT_COLORS = {
+    """
+    Goal 4B: Adjacent Configuration
+    
+    Create towers in 2×2 grid with mixed heights and colors:
+    - Two red towers (one height-2, one height-1)
+    - Two green towers (one height-2, one height-1)
+    
+    Grid layout (rows × cols):
+    [R(2)]  [G(2)]
+    [R(1)]  [G(1)]
+    
+    Where R/G = color, (N) = height
+    """
+    "on": [
+        ("r1", "r2"),   # Red tower height 2 (position 0)
+        ("g1", "g2"),   # Green tower height 2 (position 1)
+        # r3 sits alone at position 2 (height 1)
+        # g3 sits alone at position 3 (height 1)
+    ],
+    "ontable": ["r2", "g2", "r3", "g3"],  # Four base blocks
+    "clear": ["r1", "g1", "r3", "g3"],    # Four top blocks (2 are also bases)
+    
+    # Spatial constraints (loaded dynamically)
+}
+
+
 def get_goal(goal_name):
+    """
+    Retrieve goal configuration by name
+    
+    Available goals:
+    - "two_towers": Goal 1 - Two 3-block towers (RGB + YMC)
+    - "five_tower": Goal 2 - Single 5-block tower
+    - "six_tower": Goal 3 - Single 6-block tower (tallest)
+    - "tower_grid": Goal 4A - 12 yellow blocks in 3×4 grid pattern
+    - "adjacent": Goal 4B - 3 red + 3 green in 2×2 grid with mixed heights
+    
+    Args:
+        goal_name: Name of goal (case-insensitive)
+    
+    Returns:
+        dict: Goal configuration with predicates (and spatial constraints for Goal 4)
+    """
     goals = {
         "two_towers": GOAL_TWO_TOWERS,
         "five_tower": GOAL_FIVE_TOWER,
         "six_tower": GOAL_SIX_TOWER,
+        "tower_grid": GOAL_TOWER_GRID,
+        "adjacent": GOAL_ADJACENT_COLORS,
     }
     
     goal = goals.get(goal_name.lower())
+    
     if goal is None:
         print(f"[WARN] Goal '{goal_name}' not found. Available goals:")
         for name in goals.keys():
             print(f"  - {name}")
+        return None
+    
+    # Add spatial constraints for Goal 4 if not already present
+    if goal_name.lower() == "tower_grid" and "spatial" not in goal:
+        positions = _get_grid_positions()
+        goal["spatial"] = {
+            "y7": positions[1],
+            "y8": positions[2],
+            "y9": positions[4],
+            "y10": positions[7],
+            "y11": positions[9],
+            "y12": positions[10],
+        }
+        print("[Goals] Added spatial constraints to tower_grid")
+    
+    elif goal_name.lower() == "adjacent" and "spatial" not in goal:
+        positions = _get_2x2_positions()
+        goal["spatial"] = {
+            "r2": positions[0],  # Top-left
+            "g2": positions[1],  # Top-right
+            "r3": positions[2],  # Bottom-left
+            "g3": positions[3],  # Bottom-right
+        }
+        print("[Goals] Added spatial constraints to adjacent")
+    
     return goal
 
 
