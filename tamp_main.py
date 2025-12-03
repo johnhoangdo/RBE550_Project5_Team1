@@ -97,7 +97,7 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
 
         elif act == "put-down":
             if len(args) < 1:
-                print("[ERROR] put-down requires 1 argument")
+                print("[ERROR] put-down requires at least 1 argument")
                 return False
             
             held_obj = planner.attached_object
@@ -112,17 +112,29 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
                     block_name = name
                     break
             
-            # Place on table at reasonable location
-            # Use current position but on table height
-            pos = held_obj.get_pos()
-            target_pos = np.array([pos[0], pos[1], 0.02])
+            # Check if target position specified (for Goal 4 spatial)
+            if len(args) >= 3:
+                # Format: put-down block x y
+                try:
+                    target_x = float(args[1])
+                    target_y = float(args[2])
+                    target_pos = np.array([target_x, target_y, 0.02])
+                    print(f"  Target position: ({target_x:.3f}, {target_y:.3f})")
+                except (ValueError, IndexError):
+                    # Fallback to current position
+                    pos = held_obj.get_pos()
+                    target_pos = np.array([pos[0], pos[1], 0.02])
+            else:
+                # Place on table at current XY position
+                pos = held_obj.get_pos()
+                target_pos = np.array([pos[0], pos[1], 0.02])
             
             success = planner.put_down(target_pos)
             
             if success:
-                print(f" Successfully put down {block_name or 'block'}")
+                print(f"  ✓ Successfully put down {block_name or 'block'}")
             else:
-                print(f" Failed to put down {block_name or 'block'}")
+                print(f"  ✗ Failed to put down {block_name or 'block'}")
             
             return success
 
@@ -200,6 +212,81 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
         import traceback
         traceback.print_exc()
         return False
+
+
+def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_state):
+    """
+    For Goal 4: Insert pick-up/put-down actions to move base blocks to target positions
+    
+    This function analyzes the plan and inserts positioning moves BEFORE any block
+    is used as a stacking target, ensuring blocks are at their spatial constraint
+    positions before being stacked on.
+    
+    Args:
+        plan: Original symbolic plan from PDDL
+        current_state: Current symbolic state
+        goal_predicates: Goal with spatial constraints
+        blocks_state: Block entities for position checking
+    
+    Returns:
+        Augmented plan with positioning moves
+    """
+    if "spatial" not in goal_predicates:
+        return plan
+    
+    spatial_targets = goal_predicates["spatial"]
+    augmented_plan = []
+    blocks_positioned = set()  # Track which blocks we've already positioned
+    
+    print("\n[SPATIAL] Augmenting plan with positioning moves...")
+    
+    for action in plan:
+        action_name = action[0]
+        
+        # Check if this action uses a block that needs positioning
+        if action_name == "stack" and len(action) >= 3:
+            top_block = action[1]
+            bottom_block = action[2]
+            
+            # If bottom block needs to be at specific position and hasn't been moved yet
+            if bottom_block in spatial_targets and bottom_block not in blocks_positioned:
+                target_pos = spatial_targets[bottom_block]
+                
+                # Check current position
+                current_pos = blocks_state[bottom_block].get_pos()
+                distance = ((current_pos[0] - target_pos[0])**2 + 
+                           (current_pos[1] - target_pos[1])**2)**0.5
+                
+                # If block is far from target (>5cm), add positioning moves
+                if distance > 0.05:
+                    print(f"  Positioning {bottom_block} to {target_pos}")
+                    
+                    # Add pick-up and put-down to move block
+                    augmented_plan.append(("pick-up", bottom_block))
+                    augmented_plan.append(("put-down", bottom_block, str(target_pos[0]), str(target_pos[1])))
+                    
+                    blocks_positioned.add(bottom_block)
+        
+        elif action_name == "put-down" and len(action) >= 2:
+            block = action[1]
+            
+            # If this block has a spatial target, use it
+            if block in spatial_targets and block not in blocks_positioned:
+                target_pos = spatial_targets[block]
+                print(f"  Redirecting put-down of {block} to {target_pos}")
+                
+                # Replace with positioned put-down
+                augmented_plan.append(("put-down", block, str(target_pos[0]), str(target_pos[1])))
+                blocks_positioned.add(block)
+                continue  # Don't add original action
+        
+        # Add original action
+        augmented_plan.append(action)
+    
+    if blocks_positioned:
+        print(f"[SPATIAL] Positioned {len(blocks_positioned)} blocks: {blocks_positioned}")
+    
+    return augmented_plan
 
 
 def tamp_loop(scene, robot, blocks_state, 
@@ -311,6 +398,12 @@ def tamp_loop(scene, robot, blocks_state,
 
         # Parse and validate plan
         plan = parse_plan_output(plan)
+        
+        # For Goal 4: Insert positioning moves to satisfy spatial constraints
+        if use_spatial and "spatial" in goal_predicates:
+            plan = augment_plan_with_positioning(
+                plan, current_state, goal_predicates, blocks_state
+            )
         
         print(f"\n  Generated plan with {len(plan)} actions:")
         for i, step in enumerate(plan, 1):
