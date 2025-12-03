@@ -293,7 +293,7 @@ def tamp_loop(scene, robot, blocks_state,
             
             # Let physics settle after each action
             print("  Settling physics...")
-            for _ in range(100):
+            for _ in range(300):
                 scene.step()
         
         if execution_failed:
@@ -306,7 +306,7 @@ def tamp_loop(scene, robot, blocks_state,
         print("\n[STEP 5] Verifying execution...")
         
         # Let physics fully settle
-        for _ in range(200):
+        for _ in range(300):
             scene.step()
         
         # Check final state
