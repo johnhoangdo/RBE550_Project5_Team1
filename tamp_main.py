@@ -25,8 +25,8 @@ from task_planner import call_planner, parse_plan_output, validate_plan
 from planning import PlannerInterface
 from scenes import (
     create_scene_6blocks,
-    create_scene_12_yellow_blocks,  # NEW for Goal 4A
-    create_scene_3red_3green        # NEW for Goal 4B
+    create_scene_12_yellow_blocks,
+    create_scene_3red_3green  
 )
 
 
