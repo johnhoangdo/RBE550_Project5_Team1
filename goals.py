@@ -67,6 +67,21 @@ GOAL_SIX_TOWER = {
 
 
 # ============================================================
+# GOAL 4A-SIMPLE: Two Tower Grid (4 Yellow Blocks) - TEST
+# ============================================================
+# Simplified version for testing - just 2 two-block towers
+GOAL_TOWER_GRID_SIMPLE = {
+    "on": [
+        ("y1", "y3"),   # Tower 1
+        ("y2", "y4"),   # Tower 2
+    ],
+    "ontable": ["y3", "y4"],
+    "clear": ["y1", "y2"],
+    # Spatial constraints added dynamically
+}
+
+
+# ============================================================
 # GOAL 4A: Tower Grid Configuration (12 Yellow Blocks)
 # ============================================================
 # Import will happen at runtime to avoid circular dependency
@@ -177,6 +192,7 @@ def get_goal(goal_name):
         "five_tower": GOAL_FIVE_TOWER,
         "six_tower": GOAL_SIX_TOWER,
         "tower_grid": GOAL_TOWER_GRID,
+        "tower_grid_simple": GOAL_TOWER_GRID_SIMPLE,  # NEW: Simplified test
         "adjacent": GOAL_ADJACENT_COLORS,
     }
     
@@ -200,6 +216,14 @@ def get_goal(goal_name):
             "y12": positions[10],
         }
         print("[Goals] Added spatial constraints to tower_grid")
+    
+    elif goal_name.lower() == "tower_grid_simple" and "spatial" not in goal:
+        positions = _get_grid_positions()
+        goal["spatial"] = {
+            "y3": positions[0],   # First tower base
+            "y4": positions[2],   # Second tower base
+        }
+        print("[Goals] Added spatial constraints to tower_grid_simple")
     
     elif goal_name.lower() == "adjacent" and "spatial" not in goal:
         positions = _get_2x2_positions()
