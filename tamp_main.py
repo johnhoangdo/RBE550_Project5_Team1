@@ -4,7 +4,7 @@ tamp_main.py
 Main Task and Motion Planning (TAMP) loop
 
 Author: LA, JHD, JEN
-Date: 12/02/2025
+Date: 11/21/2025
 """
 
 import sys
@@ -25,8 +25,8 @@ from task_planner import call_planner, parse_plan_output, validate_plan
 from planning import PlannerInterface
 from scenes import (
     create_scene_6blocks,
-    create_scene_12_yellow_blocks,
-    create_scene_3red_3green  
+    create_scene_12_yellow_blocks,  # NEW for Goal 4A
+    create_scene_3red_3green        # NEW for Goal 4B
 )
 
 
@@ -206,7 +206,8 @@ def tamp_loop(scene, robot, blocks_state,
               goal_predicates=GOAL_TWO_TOWERS,
               domain_file="blocksworld_domain.pddl",
               max_iterations=10,
-              use_spatial=False):  # NEW parameter for Goal 4
+              use_spatial=False,
+              planning_timeout=30):  # NEW parameter
     """
     Full TAMP execution loop with replanning.
 
@@ -226,6 +227,7 @@ def tamp_loop(scene, robot, blocks_state,
         domain_file: path to blocksworld_domain.pddl
         max_iterations: maximum planning iterations before giving up
         use_spatial: if True, check spatial constraints (Goal 4)
+        planning_timeout: timeout for PDDL planner in seconds
     
     Returns:
         bool: True if goal achieved, False if failed
@@ -235,6 +237,7 @@ def tamp_loop(scene, robot, blocks_state,
     if use_spatial:
         print("(with spatial constraint checking)".center(60))
     print("="*60)
+    print(f"Planning timeout: {planning_timeout}s")
     
     # Create planner interface
     planner_interface = PlannerInterface(robot, scene)
@@ -297,10 +300,10 @@ def tamp_loop(scene, robot, blocks_state,
         
         print(f"  Generated problem file: {problem_file}")
         
-        # Call planner with timeout
+        # Call planner with timeout (longer for complex goals)
         plan = call_planner(domain_file, problem_file, 
                            use_pyperplan=True, 
-                           timeout=30)
+                           timeout=planning_timeout)
         
         if not plan:
             print("\n✗ No plan found. Unable to achieve goal.")
@@ -372,6 +375,7 @@ def main():
     use_gpu = "gpu" in sys.argv
     use_goal3_extended = "--goal3-ext" in sys.argv
     use_goal4a = "--goal4a" in sys.argv or "--tower-grid" in sys.argv
+    use_goal4a_simple = "--goal4a-simple" in sys.argv or "--test" in sys.argv
     use_goal4b = "--goal4b" in sys.argv or "--adjacent" in sys.argv
     
     # Configure mode
@@ -381,12 +385,15 @@ def main():
         abstraction.set_goal_mode('goal3_extended')
         planning.set_planning_mode('goal3_extended')
         max_iterations = 30
+        planning_timeout = 60  # Longer timeout for complex goals
     elif use_goal4a or use_goal4b:
         print("\n[MODE] Goal 4 - Spatial Grid Structures")
         max_iterations = 15
+        planning_timeout = 90  # Much longer timeout for 12-block planning
     else:
         print("\n[MODE] Goal 3 (6-block tower)")
         max_iterations = 10
+        planning_timeout = 30  # Default timeout
     
     # Initialize Genesis
     print("\n[INIT] Initializing Genesis simulator...")
@@ -401,6 +408,20 @@ def main():
         scene, franka, blocks_state = create_scene_12_yellow_blocks()
         goal_name_str = "tower_grid"
         goal_description = "Goal 4A: Tower Grid (12 yellow)"
+        use_spatial = True
+    elif use_goal4a_simple:
+        # Use regular 6-block scene but only use 4 blocks
+        scene, franka, blocks_state = create_scene_6blocks()
+        # Rename blocks to y1-y4
+        blocks_renamed = {
+            "y1": blocks_state["y"],
+            "y2": blocks_state["m"],
+            "y3": blocks_state["c"],
+            "y4": blocks_state["r"],
+        }
+        blocks_state = blocks_renamed
+        goal_name_str = "tower_grid_simple"
+        goal_description = "Goal 4A-Simple: 2 Towers (4 blocks TEST)"
         use_spatial = True
     elif use_goal4b:
         scene, franka, blocks_state = create_scene_3red_3green()
@@ -441,7 +462,8 @@ def main():
         goal_predicates=goal,
         domain_file="blocksworld_domain.pddl",
         max_iterations=max_iterations,
-        use_spatial=use_spatial
+        use_spatial=use_spatial,
+        planning_timeout=planning_timeout
     )
     
     # Report
