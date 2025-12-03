@@ -48,10 +48,28 @@ GOAL_FIVE_TOWER = {
 }
 
 
+# ============================================================
+# GOAL 3: Tallest Tower - Six Blocks
+# ============================================================
+GOAL_SIX_TOWER = {
+    "on": [
+        ("c", "m"),   # cyan on magenta (top)
+        ("m", "y"),   # magenta on yellow
+        ("y", "b"),   # yellow on blue
+        ("b", "r"),   # blue on red
+        ("r", "g")    # red on green (bottom)
+    ],
+    "ontable": ["g"],   # green is base
+    "clear": ["c"],     # cyan is top
+}
+
+
+
 def get_goal(goal_name):
     goals = {
         "two_towers": GOAL_TWO_TOWERS,
         "five_tower": GOAL_FIVE_TOWER,
+        "six_tower": GOAL_SIX_TOWER,
     }
     
     goal = goals.get(goal_name.lower())
