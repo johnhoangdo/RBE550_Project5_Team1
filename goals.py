@@ -88,18 +88,16 @@ def _get_grid_positions():
 # Pattern: X T T X / T X X T / X T T X
 # Where X = empty, T = 2-block tower
 # Tower positions: indices 1, 2, 4, 7, 9, 10 (out of 0-11)
+#
+# Goal 4A: Tower Grid Configuration
+# Create 6 two-block towers arranged in specific 3×4 grid pattern.
+# Uses 12 yellow blocks (y1-y12).
+# 
+# Pattern visualization:
+# Row 1:  Empty  Tower  Tower  Empty
+# Row 2:  Tower  Empty  Empty  Tower
+# Row 3:  Empty  Tower  Tower  Empty
 GOAL_TOWER_GRID = {
-    """
-    Goal 4A: Tower Grid Configuration
-    
-    Create 6 two-block towers arranged in specific 3×4 grid pattern.
-    Uses 12 yellow blocks (y1-y12).
-    
-    Pattern visualization:
-    Row 1:  Empty  Tower  Tower  Empty
-    Row 2:  Tower  Empty  Empty  Tower
-    Row 3:  Empty  Tower  Tower  Empty
-    """
     "on": [
         # 6 towers, each 2 blocks high
         ("y1", "y7"),   # Tower at grid position 1
@@ -119,6 +117,17 @@ GOAL_TOWER_GRID = {
 # ============================================================
 # GOAL 4B: Adjacent Configuration (3 Red + 3 Green)
 # ============================================================
+# Goal 4B: Adjacent Configuration
+# 
+# Create towers in 2×2 grid with mixed heights and colors:
+# - Two red towers (one height-2, one height-1)
+# - Two green towers (one height-2, one height-1)
+# 
+# Grid layout (rows × cols):
+# [R(2)]  [G(2)]
+# [R(1)]  [G(1)]
+# 
+# Where R/G = color, (N) = height
 def _get_2x2_positions():
     """Lazy import to get 2×2 grid positions"""
     try:
@@ -133,19 +142,6 @@ def _get_2x2_positions():
                 (0.60, -0.075), (0.60, 0.075)]
 
 GOAL_ADJACENT_COLORS = {
-    """
-    Goal 4B: Adjacent Configuration
-    
-    Create towers in 2×2 grid with mixed heights and colors:
-    - Two red towers (one height-2, one height-1)
-    - Two green towers (one height-2, one height-1)
-    
-    Grid layout (rows × cols):
-    [R(2)]  [G(2)]
-    [R(1)]  [G(1)]
-    
-    Where R/G = color, (N) = height
-    """
     "on": [
         ("r1", "r2"),   # Red tower height 2 (position 0)
         ("g1", "g2"),   # Green tower height 2 (position 1)
