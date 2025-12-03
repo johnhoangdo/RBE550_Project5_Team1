@@ -6,6 +6,7 @@ from typing import Any
 from genesis.utils.misc import tensor_to_array
 from robot_adapter import RobotAdapter
 
+
 class PlanningConfig:
     """
     Configuration parameters for motion planning primitives
