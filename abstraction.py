@@ -7,7 +7,7 @@ Purpose:
   - Create helper utilities to check goal completion and tower stability
 
 Author: LA, JHD, JEN
-Date: 11/10/2025
+Date: 12/02/2025
 """
 
 import numpy as np
@@ -22,18 +22,18 @@ import os
 BLOCK_SIZE = 0.04  # 0.04m cubic block
 
 # Two blocks are considered aligned if their x,y centers are within this horizontal distance
-XY_ALIGNMENT_THRESHOLD = 0.02  # (50% of block width)
+XY_ALIGNMENT_THRESHOLD = 0.010
 
 # Vertical separation bounds for ON predicate
 # A block is "on" another if z-distance is within this range
-Z_MIN_SEPARATION = 0.035  # Minimum 3.5cm (slightly less than block size due to physics settling)
-Z_MAX_SEPARATION = 0.045  # Maximum 4.5cm (slightly more than block size for tolerance)
+Z_MIN_SEPARATION = 0.038  # slightly less than block size due to physics settling
+Z_MAX_SEPARATION = 0.042  # slightly more than block size for tolerance
 
 # Table height threshold: blocks below this height are considered on the table
 TABLE_HEIGHT_THRESHOLD = 0.03  # 3cm - ground plane is at z=0, block centers at z=0.02
 
 # Stability checking thresholds
-STABILITY_XY_THRESHOLD = 0.025  # blocks can drift slightly but still be stable
+STABILITY_XY_THRESHOLD = 0.010  # blocks can drift slightly but still be stable
 STABILITY_Z_TOLERANCE = 0.005   # vertical position variation tolerance
 
 
