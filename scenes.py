@@ -141,6 +141,65 @@ def create_scene_12_yellow_blocks() -> Tuple[Any, Any, Dict[str, Any]]:
     
     return scene, franka, blocks
 
+def create_scene_3red_3green() -> Tuple[Any, Any, Dict[str, Any]]:
+    """
+    Create scene with 3 red + 3 green blocks for Adjacent configuration
+    
+    Returns:
+        scene, franka_adapter, blocks_state
+    
+    Blocks named: r1, r2, r3, g1, g2, g3
+    """
+    scene = _build_base_scene()
+    plane = scene.add_entity(gs.morphs.Plane())
+    
+    # Initial scattered positions
+    positions_red = [
+        (0.65, -0.20, 0.02),
+        (0.65, 0.00, 0.02),
+        (0.65, 0.20, 0.02)
+    ]
+    
+    positions_green = [
+        (0.50, -0.20, 0.02),
+        (0.50, 0.00, 0.02),
+        (0.50, 0.20, 0.02)
+    ]
+    
+    blocks = {}
+    
+    # Create red blocks
+    for i, pos in enumerate(positions_red):
+        pos_noisy = _rand_xy(pos, noise=0.03)
+        cube = scene.add_entity(
+            gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=pos_noisy),
+            surface=gs.options.surfaces.Plastic(color=(1.0, 0.0, 0.0))  # Red
+        )
+        blocks[f"r{i+1}"] = cube
+    
+    # Create green blocks
+    for i, pos in enumerate(positions_green):
+        pos_noisy = _rand_xy(pos, noise=0.03)
+        cube = scene.add_entity(
+            gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=pos_noisy),
+            surface=gs.options.surfaces.Plastic(color=(0.0, 1.0, 0.0))  # Green
+        )
+        blocks[f"g{i+1}"] = cube
+    
+    # Add robot
+    franka_raw = scene.add_entity(
+        gs.morphs.MJCF(file="xml/franka_emika_panda/panda.xml")
+    )
+    franka = RobotAdapter(franka_raw, scene)
+    
+    scene.build()
+    franka.set_qpos(np.array([0.0, -0.5, -0.2, -1.0, 0.0, 1.00, 0.5, 0.02, 0.02]))
+    _elevate_robot_base(franka)
+    
+    print(f"[Scene] Created 3 red + 3 green blocks: r1-r3, g1-g3")
+    
+    return scene, franka, blocks
+
 def create_scene_stacked() -> Tuple[Any, Any, Dict[str, Any], Any]:
     """
     Create a scene with all 6 blocks pre-stacked in a tower.
