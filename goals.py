@@ -149,12 +149,12 @@ def _get_2x2_positions():
         from abstraction import calculate_2x2_grid_positions
         return calculate_2x2_grid_positions(
             center=(0.525, 0.0),
-            spacing=0.15
+            spacing=0.10  # Reduced from 0.15 to 0.10 (closer together)
         )
     except ImportError:
-        # Fallback
-        return [(0.45, -0.075), (0.45, 0.075), 
-                (0.60, -0.075), (0.60, 0.075)]
+        # Fallback - also with closer spacing
+        return [(0.475, -0.05), (0.475, 0.05), 
+                (0.575, -0.05), (0.575, 0.05)]
 
 GOAL_ADJACENT_COLORS = {
     "on": [
