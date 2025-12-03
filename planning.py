@@ -264,7 +264,7 @@ class PlannerInterface:
     # MOTION PRIMITIVES
     # =========================================================================
 
-    def pick_up(self, block, pre_grasp_height=0.20, grasp_offset=0.09):
+    def pick_up(self, block, pre_grasp_height=0.25, grasp_offset=0.09):
         """
         Pick up a block from the table or from on top of another block
         
@@ -338,7 +338,7 @@ class PlannerInterface:
             
             # Straight line interpolation down
             gs.logger.info("Lowering to grasp...")
-            num_steps = 50
+            num_steps = 100
             for i in range(num_steps + 1):
                 alpha = i / num_steps
                 waypoint = (1-alpha) * qpos_pregrasp + alpha * qpos_grasp
