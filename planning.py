@@ -6,6 +6,130 @@ from typing import Any
 from genesis.utils.misc import tensor_to_array
 from robot_adapter import RobotAdapter
 
+class PlanningConfig:
+    """
+    Configuration parameters for motion planning primitives
+    
+    Different goals require different planning parameters:
+    - Default (Goals 1-2): Fast execution, lower precision
+    - Goal 3 (6 blocks): Slower, higher precision for tall towers
+    - Goal 3 Extended (10+ blocks): Very slow, very high precision
+    
+    Attributes:
+        pre_grasp_height: Height above block for pre-grasp approach (meters)
+        pre_place_height: Height above target for pre-place approach (meters)
+        descent_waypoints: Number of waypoints for vertical descent
+        settling_time: Physics settling steps after placement
+    """
+    
+    # Default configuration (Goals 1-2)
+    DEFAULT_PRE_GRASP_HEIGHT = 0.15
+    DEFAULT_PRE_PLACE_HEIGHT = 0.15
+    DEFAULT_DESCENT_WAYPOINTS = 50
+    DEFAULT_SETTLING_TIME = 100
+    
+    # Goal 3 configuration (6-block tower)
+    GOAL3_PRE_GRASP_HEIGHT = 0.25      # Higher approach for tall towers
+    GOAL3_PRE_PLACE_HEIGHT = 0.30      # Much higher placement approach
+    GOAL3_DESCENT_WAYPOINTS = 100      # Slower, more controlled descent
+    GOAL3_SETTLING_TIME = 300          # Longer physics settling
+    
+    # Goal 3 Extended configuration (10+ block towers)
+    GOAL3_EXT_PRE_GRASP_HEIGHT = 0.35  # Very high approach
+    GOAL3_EXT_PRE_PLACE_HEIGHT = 0.40  # Very high placement approach
+    GOAL3_EXT_DESCENT_WAYPOINTS = 150  # Very slow descent
+    GOAL3_EXT_SETTLING_TIME = 500      # Very long settling
+    
+    def __init__(self, mode='goal3'):
+        """
+        Initialize planning configuration
+        
+        Args:
+            mode: Configuration mode
+                - 'default': Goals 1-2 (fast, low precision)
+                - 'goal3': Goal 3 - 6 blocks (slow, high precision) [DEFAULT]
+                - 'goal3_extended': 10+ blocks (very slow, very high precision)
+        
+        Notes:
+            - Default mode is 'goal3' to match abstraction.py defaults
+            - Switch to 'default' for Goals 1-2 if needed
+            - Switch to 'goal3_extended' for 10+ block towers
+        """
+        if mode == 'goal3_extended':
+            self.pre_grasp_height = self.GOAL3_EXT_PRE_GRASP_HEIGHT
+            self.pre_place_height = self.GOAL3_EXT_PRE_PLACE_HEIGHT
+            self.descent_waypoints = self.GOAL3_EXT_DESCENT_WAYPOINTS
+            self.settling_time = self.GOAL3_EXT_SETTLING_TIME
+            self.mode = 'goal3_extended'
+            print('\n' + '='*60)
+            print('[Planning] Goal 3 Extended mode (10+ blocks)'.center(60))
+            print('='*60)
+            print(f'  Pre-grasp height:  {self.pre_grasp_height:.2f}m')
+            print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
+            print(f'  Descent waypoints: {self.descent_waypoints}')
+            print(f'  Settling time:     {self.settling_time} steps')
+            print('='*60 + '\n')
+            
+        elif mode == 'default':
+            self.pre_grasp_height = self.DEFAULT_PRE_GRASP_HEIGHT
+            self.pre_place_height = self.DEFAULT_PRE_PLACE_HEIGHT
+            self.descent_waypoints = self.DEFAULT_DESCENT_WAYPOINTS
+            self.settling_time = self.DEFAULT_SETTLING_TIME
+            self.mode = 'default'
+            print('\n' + '='*60)
+            print('[Planning] Default mode (Goals 1-2)'.center(60))
+            print('='*60)
+            print(f'  Pre-grasp height:  {self.pre_grasp_height:.2f}m')
+            print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
+            print(f'  Descent waypoints: {self.descent_waypoints}')
+            print(f'  Settling time:     {self.settling_time} steps')
+            print('='*60 + '\n')
+            
+        else:  # 'goal3' - default mode
+            self.pre_grasp_height = self.GOAL3_PRE_GRASP_HEIGHT
+            self.pre_place_height = self.GOAL3_PRE_PLACE_HEIGHT
+            self.descent_waypoints = self.GOAL3_DESCENT_WAYPOINTS
+            self.settling_time = self.GOAL3_SETTLING_TIME
+            self.mode = 'goal3'
+            print('\n' + '='*60)
+            print('[Planning] Goal 3 mode (6 blocks)'.center(60))
+            print('='*60)
+            print(f'  Pre-grasp height:  {self.pre_grasp_height:.2f}m')
+            print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
+            print(f'  Descent waypoints: {self.descent_waypoints}')
+            print(f'  Settling time:     {self.settling_time} steps')
+            print('='*60 + '\n')
+
+
+# Global configuration instance (defaults to Goal 3)
+planning_config = PlanningConfig(mode='goal3')
+
+
+def set_planning_mode(mode='goal3'):
+    """
+    Convenience function to switch planning configuration
+    
+    Args:
+        mode: 'default', 'goal3', or 'goal3_extended'
+    
+    Usage:
+        import planning
+        planning.set_planning_mode('goal3_extended')
+    """
+    global planning_config
+    planning_config = PlanningConfig(mode=mode)
+
+
+def get_planning_config():
+    """
+    Get current planning configuration
+    
+    Returns:
+        PlanningConfig: Current configuration instance
+    """
+    return planning_config
+
+
 
 def _ensure_adapter(robot: Any, scene: Any) -> RobotAdapter:
     """Wrap raw genesis robot in RobotAdapter if needed.
