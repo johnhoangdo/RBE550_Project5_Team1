@@ -25,6 +25,30 @@ from planning import PlannerInterface
 from scenes import create_scene_6blocks
 
 
+def verify_tower_stability(blocks_state, tower_blocks, max_retries=3):
+    """
+    Check tower stability with retry mechanism for Goal 3
+    """
+    from abstraction import check_tower_stable
+    
+    for attempt in range(max_retries):
+        # Let tower settle
+        for _ in range(100):
+            scene.step()
+        
+        # Check stability
+        if check_tower_stable(blocks_state, tower_blocks):
+            return True
+        
+        print(f"  Tower unstable, waiting... (attempt {attempt+1}/{max_retries})")
+        
+        # Wait longer
+        for _ in range(300):
+            scene.step()
+    
+    return False
+
+
 def execute_primitive(action_tuple, planner, scene, blocks_state):
     """
     Execute one symbolic action (pick-up, put-down, stack, unstack)
