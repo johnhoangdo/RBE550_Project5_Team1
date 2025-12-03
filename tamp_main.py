@@ -419,7 +419,7 @@ def main():
         blocks_state=blocks_state,
         goal_predicates=goal,
         domain_file="blocksworld_domain.pddl",
-        max_iterations=10
+        max_iterations=20
     )
     
     # =========================================================================
