@@ -19,7 +19,7 @@ from abstraction import (
     check_tower_stable,
     get_all_towers
 )
-from goals import GOAL_TWO_TOWERS, get_goal
+from goals import GOAL_TWO_TOWERS, GOAL_SIX_TOWER, GOAL_FIVE_TOWER, get_goal
 from task_planner import call_planner, parse_plan_output, validate_plan
 from planning import PlannerInterface
 from scenes import create_scene_6blocks
@@ -357,7 +357,7 @@ def main():
     """Main entry point with proper Genesis initialization."""
     
     print("\n" + "="*60)
-    print("PROJECT 5: BUILDING THE TWO TOWERS".center(60))
+    print("PROJECT 5: BUILDING THE 6 TOWERS".center(60))
     print("Task and Motion Planning (TAMP)".center(60))
     print("="*60)
     
@@ -403,9 +403,8 @@ def main():
     # =========================================================================
     print("\n[INIT] Selecting goal...")
     
-    # You can change the goal here
-    goal = get_goal("five_tower")  # Import get_goal from goals
-    goal_name = "Five-Block Tower (MYBRG)"
+    goal = get_goal("six_tower")
+    goal_name = "Six-Block Tower (MYBRG)"
     
     print(f"  Goal: {goal_name}")
     visualize_predicates(goal, "Goal Configuration")

@@ -41,7 +41,7 @@ def _rand_xy(base, noise=0.05):
     dy = random.uniform(-noise, noise)
     return (base[0] + dx, base[1] + dy, base[2])
 
-def create_scene_6blocks() -> Tuple[Any, Any, Dict[str, Any], Any]:
+def create_scene_6blocks() -> Tuple[Any, Any, Dict[str, Any]]:
     """
     Create the default 6-block scene with blocks spread out on the table.
     
@@ -49,7 +49,6 @@ def create_scene_6blocks() -> Tuple[Any, Any, Dict[str, Any], Any]:
         scene, franka_adapter, blocks_state
     """
     scene = _build_base_scene()
-
     # Add ground plane
     plane = scene.add_entity(gs.morphs.Plane())
     
@@ -104,6 +103,43 @@ def create_scene_6blocks() -> Tuple[Any, Any, Dict[str, Any], Any]:
 
     return scene, franka, blocks_state
 
+def create_scene_12_yellow_blocks() -> Tuple[Any, Any, Dict[str, Any]]:
+    """
+    Create scene with 12 identical yellow blocks for Tower configuration (Goal 4A).
+    
+    Returns:
+        scene, franka_adapter, blocks_state
+    """
+    scene = _build_base_scene()
+    plane = scene.add_entity(gs.morphs.Plane())
+    
+    blocks = {}
+    # Create 12 yellow blocks with distinct names
+    positions = [
+        (0.70, -0.3, 0.02), (0.70, -0.1, 0.02), (0.70, 0.1, 0.02), (0.70, 0.3, 0.02),
+        (0.55, -0.3, 0.02), (0.55, -0.1, 0.02), (0.55, 0.1, 0.02), (0.55, 0.3, 0.02),
+        (0.40, -0.3, 0.02), (0.40, -0.1, 0.02), (0.40, 0.1, 0.02), (0.40, 0.3, 0.02)
+    ]
+    
+    for i, pos in enumerate(positions):
+        pos_noisy = _rand_xy(pos, noise=0.03)
+        cube = scene.add_entity(
+            gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=pos_noisy),
+            surface=gs.options.surfaces.Plastic(color=(1.0, 1.0, 0.0))
+        )
+        blocks[f"y{i+1}"] = cube  # y1, y2, ..., y12
+    
+    # Add robot
+    franka_raw = scene.add_entity(
+        gs.morphs.MJCF(file="xml/franka_emika_panda/panda.xml")
+    )
+    franka = RobotAdapter(franka_raw, scene)
+    
+    scene.build()
+    franka.set_qpos(np.array([0.0, -0.5, -0.2, -1.0, 0.0, 1.00, 0.5, 0.02, 0.02]))
+    _elevate_robot_base(franka)
+    
+    return scene, franka, blocks
 
 def create_scene_stacked() -> Tuple[Any, Any, Dict[str, Any], Any]:
     """
