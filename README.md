@@ -20,7 +20,7 @@ python run demo.py
 
 
 Pre-requisite:
-- Ubuntu ...
+- Ubuntu 22.04
 - Virtual environment is created using python venv. Instructions might be adapted for using conda.
 
 
