@@ -628,7 +628,13 @@ class PlannerInterface:
                 self.scene.step()
             
             # 6. Let physics settle (LONGER for positioned blocks)
-            if target_x is not None and target_y is not None:
+            # Check if this is a spatial positioning (not just putting down anywhere)
+            is_spatial_placement = (
+                abs(target_pos[0]) > 0.01 and  # Not at origin
+                abs(target_pos[1]) > 0.01       # Not at origin
+            )
+            
+            if is_spatial_placement:
                 gs.logger.info("Extra settling for positioned block...")
                 for _ in range(300):  # Much longer settling
                     self.scene.step()
@@ -636,10 +642,10 @@ class PlannerInterface:
                 # Verify position
                 if placed_block:
                     final_pos = placed_block.get_pos()
-                    dx = abs(final_pos[0] - target_x)
-                    dy = abs(final_pos[1] - target_y)
+                    dx = abs(final_pos[0] - target_pos[0])
+                    dy = abs(final_pos[1] - target_pos[1])
                     gs.logger.info(
-                        f"Position verification: target=({target_x:.4f}, {target_y:.4f}), "
+                        f"Position verification: target=({target_pos[0]:.4f}, {target_pos[1]:.4f}), "
                         f"actual=({final_pos[0]:.4f}, {final_pos[1]:.4f}), "
                         f"error=({dx*100:.1f}cm, {dy*100:.1f}cm)"
                     )
@@ -648,6 +654,8 @@ class PlannerInterface:
                         gs.logger.warning(
                             f"Position error exceeds tolerance! May need repositioning."
                         )
+                        # Return False to trigger replan
+                        return False
             else:
                 gs.logger.info("Letting physics settle...")
                 for _ in range(150):
