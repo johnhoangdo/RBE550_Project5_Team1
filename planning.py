@@ -9,91 +9,91 @@ from robot_adapter import RobotAdapter
 
 class PlanningConfig:
     """
-    Configuration parameters for motion planning primitives.
-
-    These presets reflect different stability and precision requirements
-    depending on the task:
-
-    - **Fast Mode**:  
-      Prioritizes speed over precision. Suitable for simple placements,
-      low stacks, or tasks with large error tolerance.
-
-    - **High-Stability Mode**:  
-      Slower, more controlled motions intended for medium-height stacks
-      where placement accuracy significantly affects stability.
-
-    - **Ultra-Precision Mode**:  
-      Very slow, very high accuracy settings for tall or delicate
-      structures where even small placement error compounds.
-
+    Configuration parameters for motion planning primitives
+    
+    Different goals require different planning parameters:
+    - Default (Goals 1-2): Fast execution, lower precision
+    - Goal 3 (6 blocks): Slower, higher precision for tall towers
+    - Goal 3 Extended (10+ blocks): Very slow, very high precision
+    
     Attributes:
-        pre_grasp_height:   Approach height above target (meters)
-        pre_place_height:   Vertical margin above placement (meters)
-        descent_waypoints:  Number of interpolation steps used for descent
-        settling_time:      Physics settling steps after placing an object
+        pre_grasp_height: Height above block for pre-grasp approach (meters)
+        pre_place_height: Height above target for pre-place approach (meters)
+        descent_waypoints: Number of waypoints for vertical descent
+        settling_time: Physics settling steps after placement
     """
-
-    # Fast Mode (low precision, high speed)
+    
+    # Default configuration (Goals 1-2)
     DEFAULT_PRE_GRASP_HEIGHT = 0.15
     DEFAULT_PRE_PLACE_HEIGHT = 0.15
     DEFAULT_DESCENT_WAYPOINTS = 50
     DEFAULT_SETTLING_TIME = 100
-
-    # High-Stability Mode (higher precision, moderate speed)
-    HIGH_STAB_PRE_GRASP_HEIGHT = 0.25
-    HIGH_STAB_PRE_PLACE_HEIGHT = 0.30
-    HIGH_STAB_DESCENT_WAYPOINTS = 100
-    HIGH_STAB_SETTLING_TIME = 300
-
-    # Ultra-Precision Mode (maximum precision for tall stacks)
-    ULTRA_PRE_GRASP_HEIGHT = 0.35
-    ULTRA_PRE_PLACE_HEIGHT = 0.40
-    ULTRA_DESCENT_WAYPOINTS = 150
-    ULTRA_SETTLING_TIME = 500
-
     
-    def __init__(self, mode='high_precision'):
+    # Goal 3 configuration (6-block tower)
+    GOAL3_PRE_GRASP_HEIGHT = 0.25      # Higher approach for tall towers
+    GOAL3_PRE_PLACE_HEIGHT = 0.30      # Much higher placement approach
+    GOAL3_DESCENT_WAYPOINTS = 100      # Slower, more controlled descent
+    GOAL3_SETTLING_TIME = 300          # Longer physics settling
+    
+    # Goal 3 Extended configuration (10+ block towers)
+    GOAL3_EXT_PRE_GRASP_HEIGHT = 0.35  # Very high approach
+    GOAL3_EXT_PRE_PLACE_HEIGHT = 0.40  # Very high placement approach
+    GOAL3_EXT_DESCENT_WAYPOINTS = 150  # Very slow descent
+    GOAL3_EXT_SETTLING_TIME = 500      # Very long settling
+    
+    def __init__(self, mode='goal3'):
         """
-        Initialize planning configuration.
-
+        Initialize planning configuration
+        
         Args:
-            mode:
-                - 'fast': Prioritize speed; acceptable for simple or low-risk tasks.
-                - 'high_precision': Balanced stability and speed for moderate stacks. [DEFAULT]
-                - 'ultra_pre    cision': Maximum accuracy for tall or delicate structures.
-
+            mode: Configuration mode
+                - 'default': Goals 1-2 (fast, low precision)
+                - 'goal3': Goal 3 - 6 blocks (slow, high precision) [DEFAULT]
+                - 'goal3_extended': 10+ blocks (very slow, very high precision)
+        
         Notes:
-            - Default uses 'high_precision' for robustness.
-            - Switch to 'fast' when precision is not critical.
-            - Switch to 'ultra_precision' for tall towers (10+ blocks) or tasks
-            requiring extremely accurate vertical alignment.
+            - Default mode is 'goal3' to match abstraction.py defaults
+            - Switch to 'default' for Goals 1-2 if needed
+            - Switch to 'goal3_extended' for 10+ block towers
         """
-
-        if mode == 'ultra_precision':
-            self.pre_grasp_height = self.ULTRA_PRE_GRASP_HEIGHT
-            self.pre_place_height = self.ULTRA_PRE_PLACE_HEIGHT
-            self.descent_waypoints = self.ULTRA_DESCENT_WAYPOINTS
-            self.settling_time = self.ULTRA_SETTLING_TIME
-            self.mode = 'ultra_precision'
-
+        if mode == 'goal3_extended':
+            self.pre_grasp_height = self.GOAL3_EXT_PRE_GRASP_HEIGHT
+            self.pre_place_height = self.GOAL3_EXT_PRE_PLACE_HEIGHT
+            self.descent_waypoints = self.GOAL3_EXT_DESCENT_WAYPOINTS
+            self.settling_time = self.GOAL3_EXT_SETTLING_TIME
+            self.mode = 'goal3_extended'
             print('\n' + '='*60)
-            print('[Planning] Ultra-Precision Mode (tall/delicate structures)'.center(60))
+            print('[Planning] Goal 3 Extended mode (10+ blocks)'.center(60))
             print('='*60)
             print(f'  Pre-grasp height:  {self.pre_grasp_height:.2f}m')
             print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
             print(f'  Descent waypoints: {self.descent_waypoints}')
             print(f'  Settling time:     {self.settling_time} steps')
             print('='*60 + '\n')
-
-        elif mode == 'fast':
+            
+        elif mode == 'default':
             self.pre_grasp_height = self.DEFAULT_PRE_GRASP_HEIGHT
             self.pre_place_height = self.DEFAULT_PRE_PLACE_HEIGHT
             self.descent_waypoints = self.DEFAULT_DESCENT_WAYPOINTS
             self.settling_time = self.DEFAULT_SETTLING_TIME
-            self.mode = 'fast'
-
+            self.mode = 'default'
             print('\n' + '='*60)
-            print('[Planning] Fast Mode (low precision required)'.center(60))
+            print('[Planning] Default mode (Goals 1-2)'.center(60))
+            print('='*60)
+            print(f'  Pre-grasp height:  {self.pre_grasp_height:.2f}m')
+            print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
+            print(f'  Descent waypoints: {self.descent_waypoints}')
+            print(f'  Settling time:     {self.settling_time} steps')
+            print('='*60 + '\n')
+            
+        else:  # 'goal3' - default mode
+            self.pre_grasp_height = self.GOAL3_PRE_GRASP_HEIGHT
+            self.pre_place_height = self.GOAL3_PRE_PLACE_HEIGHT
+            self.descent_waypoints = self.GOAL3_DESCENT_WAYPOINTS
+            self.settling_time = self.GOAL3_SETTLING_TIME
+            self.mode = 'goal3'
+            print('\n' + '='*60)
+            print('[Planning] Goal 3 mode (6 blocks)'.center(60))
             print('='*60)
             print(f'  Pre-grasp height:  {self.pre_grasp_height:.2f}m')
             print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
@@ -101,34 +101,21 @@ class PlanningConfig:
             print(f'  Settling time:     {self.settling_time} steps')
             print('='*60 + '\n')
 
-        else:  # 'high_precision'
-            self.pre_grasp_height = self.HIGH_STAB_PRE_GRASP_HEIGHT
-            self.pre_place_height = self.HIGH_STAB_PRE_PLACE_HEIGHT
-            self.descent_waypoints = self.HIGH_STAB_DESCENT_WAYPOINTS
-            self.settling_time = self.HIGH_STAB_SETTLING_TIME
-            self.mode = 'high_precision'
 
-            print('\n' + '='*60)
-            print('[Planning] High-Precision Mode (medium-height stacks)'.center(60))
-            print('='*60)
-            print(f'  Pre-grasp height:  {self.pre_grasp_height:.2f}m')
-            print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
-            print(f'  Descent waypoints: {self.descent_waypoints}')
-            print(f'  Settling time:     {self.settling_time} steps')
-            print('='*60 + '\n')
+# Global configuration instance (defaults to Goal 3)
+planning_config = PlanningConfig(mode='goal3')
 
 
-
-# Global configuration instance (defaults to high precision)
-planning_config = PlanningConfig(mode='high_precision')
-
-
-def set_planning_mode(mode='high_precision'):
+def set_planning_mode(mode='goal3'):
     """
-    Convenience function to switch planning configuration.
+    Convenience function to switch planning configuration
     
     Args:
-        mode: 'fast', 'high_precision', or 'ultra_precision'
+        mode: 'default', 'goal3', or 'goal3_extended'
+    
+    Usage:
+        import planning
+        planning.set_planning_mode('goal3_extended')
     """
     global planning_config
     planning_config = PlanningConfig(mode=mode)
@@ -474,9 +461,9 @@ class PlannerInterface:
             
             qpos_grasp[-2:] = 0.04  # Keep gripper open
             
-            # Straight line interpolation down
+            # Straight line interpolation down (SLOWER for control)
             gs.logger.info("Lowering to grasp...")
-            num_steps = 100
+            num_steps = 150  # Increased from 100
             for i in range(num_steps + 1):
                 alpha = i / num_steps
                 waypoint = (1-alpha) * qpos_pregrasp + alpha * qpos_grasp
@@ -484,23 +471,29 @@ class PlannerInterface:
                 self.robot.control_dofs_position(waypoint)
                 self.scene.step()
             
-            # 3. Close gripper
+            # 3. Close gripper with tighter grip
             gs.logger.info("Closing gripper...")
-            qpos_grasp[-2:] = 0.01  # Closed position
-            for _ in range(50):  # More time to grasp
+            qpos_grasp[-2:] = 0.005  # Tighter grip (was 0.01)
+            for _ in range(100):  # More time to ensure firm grasp (was 50)
                 self.robot.control_dofs_position(qpos_grasp)
                 self.scene.step()
+            
+            # Verify block is grasped by checking position
+            block_pos_after = block.get_pos()
+            if block_pos_after[2] < block_pos[2] - 0.01:  # Block fell
+                gs.logger.warning("Block may have fallen during grasp")
             
             # 4. Attach object for collision checking
             self.attached_object = block
             gs.logger.info(f"Attached block for collision checking")
             
-            # 5. Lift straight up to pre-grasp height
+            # 5. Lift straight up to pre-grasp height (SLOW to prevent dropping)
             gs.logger.info("Lifting...")
+            num_steps = 200  # Increased from 100 for slower lift
             for i in range(num_steps + 1):
                 alpha = i / num_steps
                 waypoint = (1-alpha) * qpos_grasp + alpha * qpos_pregrasp
-                waypoint[-2:] = 0.01  # Keep gripper closed
+                waypoint[-2:] = 0.005  # Keep gripper tightly closed
                 self.robot.control_dofs_position(waypoint)
                 self.scene.step()
             
@@ -574,7 +567,7 @@ class PlannerInterface:
             # Execute path
             gs.logger.info("Moving to pre-place...")
             for waypoint in path:
-                waypoint[-2:] = 0.01  # Keep gripper closed
+                waypoint[-2:] = 0.005  # Keep gripper TIGHTLY closed (was 0.01)
                 self.robot.control_dofs_position(waypoint)
                 self.scene.step()
             
@@ -595,7 +588,7 @@ class PlannerInterface:
                 gs.logger.warning("IK failed for place pose")
                 return False
             
-            qpos_place[-2:] = 0.01  # Keep gripper closed
+            qpos_place[-2:] = 0.005  # Keep gripper TIGHTLY closed
             
             # SLOW, GENTLE lowering
             gs.logger.info("Lowering GENTLY to place...")
@@ -603,7 +596,7 @@ class PlannerInterface:
             for i in range(num_steps + 1):
                 alpha = i / num_steps
                 waypoint = (1-alpha) * qpos_preplace + alpha * qpos_place
-                waypoint[-2:] = 0.01  # Keep gripper closed
+                waypoint[-2:] = 0.005  # Keep gripper TIGHTLY closed
                 self.robot.control_dofs_position(waypoint)
                 self.scene.step()
             
