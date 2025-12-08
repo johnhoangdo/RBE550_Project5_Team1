@@ -216,11 +216,14 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
 
 def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_state):
     """
-    For Goal 4: Insert pick-up/put-down actions to move base blocks to target positions
+    For Goal 4: Insert positioning moves at the START of the plan
     
-    This function analyzes the plan and inserts positioning moves BEFORE any block
-    is used as a stacking target, ensuring blocks are at their spatial constraint
-    positions before being stacked on.
+    Strategy:
+    1. Identify all base blocks that need positioning
+    2. Add pick-up/put-down actions for each at the START
+    3. Then execute the original stacking plan
+    
+    This ensures blocks are positioned BEFORE any stacking happens.
     
     Args:
         plan: Original symbolic plan from PDDL
@@ -229,64 +232,44 @@ def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_s
         blocks_state: Block entities for position checking
     
     Returns:
-        Augmented plan with positioning moves
+        Augmented plan with positioning moves at the beginning
     """
     if "spatial" not in goal_predicates:
         return plan
     
     spatial_targets = goal_predicates["spatial"]
-    augmented_plan = []
-    blocks_positioned = set()  # Track which blocks we've already positioned
+    positioning_actions = []
     
     print("\n[SPATIAL] Augmenting plan with positioning moves...")
     
+    # Find all blocks that need positioning
+    blocks_to_position = set()
     for action in plan:
-        action_name = action[0]
-        
-        # Check if this action uses a block that needs positioning
-        if action_name == "stack" and len(action) >= 3:
-            top_block = action[1]
+        if action[0] == "stack" and len(action) >= 3:
             bottom_block = action[2]
-            
-            # If bottom block needs to be at specific position and hasn't been moved yet
-            if bottom_block in spatial_targets and bottom_block not in blocks_positioned:
-                target_pos = spatial_targets[bottom_block]
-                
-                # Check current position
-                current_pos = blocks_state[bottom_block].get_pos()
-                distance = ((current_pos[0] - target_pos[0])**2 + 
-                           (current_pos[1] - target_pos[1])**2)**0.5
-                
-                # If block is far from target (>5cm), add positioning moves
-                if distance > 0.05:
-                    print(f"  Positioning {bottom_block} to {target_pos}")
-                    
-                    # Add pick-up and put-down to move block
-                    augmented_plan.append(("pick-up", bottom_block))
-                    augmented_plan.append(("put-down", bottom_block, str(target_pos[0]), str(target_pos[1])))
-                    
-                    blocks_positioned.add(bottom_block)
-        
-        elif action_name == "put-down" and len(action) >= 2:
-            block = action[1]
-            
-            # If this block has a spatial target, use it
-            if block in spatial_targets and block not in blocks_positioned:
-                target_pos = spatial_targets[block]
-                print(f"  Redirecting put-down of {block} to {target_pos}")
-                
-                # Replace with positioned put-down
-                augmented_plan.append(("put-down", block, str(target_pos[0]), str(target_pos[1])))
-                blocks_positioned.add(block)
-                continue  # Don't add original action
-        
-        # Add original action
-        augmented_plan.append(action)
+            if bottom_block in spatial_targets:
+                blocks_to_position.add(bottom_block)
     
-    if blocks_positioned:
-        print(f"[SPATIAL] Positioned {len(blocks_positioned)} blocks: {blocks_positioned}")
+    # Create positioning moves for each block
+    for bottom_block in blocks_to_position:
+        target_pos = spatial_targets[bottom_block]
+        
+        # Check current position
+        current_pos = blocks_state[bottom_block].get_pos()
+        distance = ((current_pos[0] - target_pos[0])**2 + 
+                   (current_pos[1] - target_pos[1])**2)**0.5
+        
+        # If block is far from target (>5cm), add positioning moves
+        if distance > 0.05:
+            print(f"  Positioning {bottom_block} to {target_pos}")
+            positioning_actions.append(("pick-up", bottom_block))
+            positioning_actions.append(("put-down", bottom_block, 
+                                       str(target_pos[0]), str(target_pos[1])))
     
-    return augmented_plan
+    print(f"[SPATIAL] Positioned {len(blocks_to_position)} blocks: {blocks_to_position}")
+    
+    # Return: positioning moves FIRST, then original plan
+    return positioning_actions + plan
 
 
 def tamp_loop(scene, robot, blocks_state, 
