@@ -405,8 +405,7 @@ class PlannerInterface:
         """
         try:
             block_pos = block.get_pos()
-            gs.logger.info(f"Attempting pick-up at position {block_pos}")
-            gs.logger.info(f"Block center XY: ({block_pos[0]:.4f}, {block_pos[1]:.4f})")  # DEBUG
+            gs.logger.info(f"Attempting pick-up at position ({block_pos[0]:.3f}, {block_pos[1]:.3f}, {block_pos[2]:.3f})")
             
             BLOCK_HEIGHT = 0.04  # 4cm blocks
             
@@ -479,20 +478,15 @@ class PlannerInterface:
                 self.robot.control_dofs_position(qpos_grasp)
                 self.scene.step()
             
-            # DEBUG: Check grasp alignment
-            gripper_pos = self.robot.get_eef_pose()[:3]
-            block_pos_after = block.get_pos()
-            xy_error = gripper_pos[:2] - block_pos_after[:2]
-            gs.logger.info(
-                f"Grasp alignment - Gripper XY: ({gripper_pos[0]:.4f}, {gripper_pos[1]:.4f}), "
-                f"Block XY: ({block_pos_after[0]:.4f}, {block_pos_after[1]:.4f}), "
-                f"Offset: ({xy_error[0]*1000:.1f}mm, {xy_error[1]*1000:.1f}mm)"
-            )
-            
-            # Verify block is grasped by checking position
+            # Verify block is grasped by checking position (single check)
             block_pos_after = block.get_pos()
             if block_pos_after[2] < block_pos[2] - 0.01:  # Block fell
                 gs.logger.warning("Block may have fallen during grasp")
+            
+            # Optional: Log grasp alignment for debugging (commented out by default)
+            # gripper_pos = self.robot.get_eef_pose()[:3]
+            # xy_error = gripper_pos[:2] - block_pos_after[:2]
+            # gs.logger.info(f"Grasp offset: ({xy_error[0]*1000:.1f}mm, {xy_error[1]*1000:.1f}mm)")
             
             # 4. Attach object for collision checking
             self.attached_object = block
