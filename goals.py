@@ -91,7 +91,7 @@ def _get_grid_positions():
         from abstraction import calculate_grid_positions
         return calculate_grid_positions(
             center=(0.30, 0.0),  # Move grid BACK (closer to robot base, away from spawn)
-            spacing=0.10,
+            spacing=0.045,
             grid_shape=(3, 4)
         )
     except ImportError:
