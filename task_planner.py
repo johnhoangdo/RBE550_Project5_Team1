@@ -149,8 +149,12 @@ def call_planner(domain_file: str, problem_file: str,
             domain = parser.parse_domain()
             problem = parser.parse_problem(domain)
             
+            # Use A* search with hFF heuristic (much faster than BFS!)
             from pyperplan import search as pyperplan_search
-            solution = pyperplan_search.breadth_first_search(problem)
+            from pyperplan.heuristics.hff import hFFHeuristic
+            
+            heuristic = hFFHeuristic(problem)
+            solution = pyperplan_search.astar_search(problem, heuristic)
                       
             if solution:
                 plan = _normalize_pyperplan_output(solution)
@@ -174,7 +178,8 @@ def call_planner(domain_file: str, problem_file: str,
             if VERBOSE:
                 print("[task_planner] Attempting pyperplan CLI...")
             
-            cmd = f"pyperplan {domain_file} {problem_file}"
+            # Use A* search with hFF heuristic (much faster than default BFS)
+            cmd = f"pyperplan -s astar -H hff {domain_file} {problem_file}"
             
             try:
                 result = subprocess.run(
