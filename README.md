@@ -35,8 +35,9 @@ a) Check python version: python --version
 b) Download OMPL python bindings, then move the downloaded file to the directory in use
 c) Install: pip install ompl-1.7.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
 5) Install Genesis (will take a few minutes): pip install genesis-world
-6) Navigate to project folder (if not yet)
-7) python3 demo.py gpu (will take a few minutes)
+6) Install Pyperplan: pip install pyperplan
+7) Navigate to project folder (if not yet)
+8) python3 demo.py gpu (will take a few minutes)
 
 
 
