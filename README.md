@@ -38,6 +38,7 @@ c) Install: pip install ompl-1.7.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2
 6) Install Pyperplan: pip install pyperplan
 7) Navigate to project folder (if not yet)
 8) python3 demo.py gpu (will take a few minutes)
+9) python3 tamp_main.py
 
 
 
