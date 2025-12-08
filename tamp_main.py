@@ -378,9 +378,13 @@ def tamp_loop(scene, robot, blocks_state,
         # STEP 3: TASK PLANNING
         # =====================================================================
         print("\n[STEP 3] Task Planning...")
+        
+        # Filter out spatial constraints for PDDL (they're not symbolic predicates)
+        goal_pddl = {k: v for k, v in goal_predicates.items() if k != "spatial"}
+        
         problem_file = generate_pddl_problem(
             current_state, 
-            goal_predicates, 
+            goal_pddl,  # Use filtered goal (no spatial key)
             filename="current_problem.pddl",
             problem_name=f"tamp-iteration-{iteration}"
         )
