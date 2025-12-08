@@ -518,8 +518,8 @@ def main():
     
     # Set control gains
     print("\n[INIT] Setting robot control gains...")
-    franka.set_dofs_kp(np.array([4500, 4500, 3500, 3500, 2000, 2000, 2000, 100, 100]))
-    franka.set_dofs_kv(np.array([450, 450, 350, 350, 200, 200, 200, 10, 10]))
+    franka.set_dofs_kp(np.array([1800, 1800, 1400, 1400, 800, 800, 800, 200, 200]))
+    franka.set_dofs_kv(np.array([180, 180, 140, 140, 80, 80, 80, 20, 20]))
     franka.set_dofs_force_range(
         np.array([-87, -87, -87, -87, -12, -12, -12, -100, -100]),
         np.array([87, 87, 87, 87, 12, 12, 12, 100, 100])
