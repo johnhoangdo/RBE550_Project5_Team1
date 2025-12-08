@@ -90,15 +90,15 @@ def _get_grid_positions():
     try:
         from abstraction import calculate_grid_positions
         return calculate_grid_positions(
-            center=(0.50, 0.0),
+            center=(0.30, 0.0),  # Move grid BACK (closer to robot base, away from spawn)
             spacing=0.10,
             grid_shape=(3, 4)
         )
     except ImportError:
-        # Fallback if abstraction not available
-        return [(0.45, -0.15), (0.45, -0.05), (0.45, 0.05), (0.45, 0.15),
-                (0.50, -0.15), (0.50, -0.05), (0.50, 0.05), (0.50, 0.15),
-                (0.55, -0.15), (0.55, -0.05), (0.55, 0.05), (0.55, 0.15)]
+        # Fallback if abstraction not available - also moved back
+        return [(0.25, -0.15), (0.25, -0.05), (0.25, 0.05), (0.25, 0.15),
+                (0.30, -0.15), (0.30, -0.05), (0.30, 0.05), (0.30, 0.15),
+                (0.35, -0.15), (0.35, -0.05), (0.35, 0.05), (0.35, 0.15)]
 
 # Pattern: X T T X / T X X T / X T T X
 # Where X = empty, T = 2-block tower
@@ -148,13 +148,13 @@ def _get_2x2_positions():
     try:
         from abstraction import calculate_2x2_grid_positions
         return calculate_2x2_grid_positions(
-            center=(0.525, 0.0),
+            center=(0.325, 0.0),  # Move back to clear spawn area
             spacing=0.10  # Reduced from 0.15 to 0.10 (closer together)
         )
     except ImportError:
-        # Fallback - also with closer spacing
-        return [(0.475, -0.05), (0.475, 0.05), 
-                (0.575, -0.05), (0.575, 0.05)]
+        # Fallback - also moved back
+        return [(0.275, -0.05), (0.275, 0.05), 
+                (0.375, -0.05), (0.375, 0.05)]
 
 GOAL_ADJACENT_COLORS = {
     "on": [
