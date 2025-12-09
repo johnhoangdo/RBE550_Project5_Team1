@@ -90,15 +90,15 @@ def _get_grid_positions():
     try:
         from abstraction import calculate_grid_positions
         return calculate_grid_positions(
-            center=(0.30, 0.0),  # Move grid BACK (closer to robot base, away from spawn)
-            spacing=0.045,
+            center=(0.30, 0.0),  # Moved back to clear spawn area
+            spacing=0.045,  # TIGHT spacing for Goal 4A (blocks almost touching!)
             grid_shape=(3, 4)
         )
     except ImportError:
-        # Fallback if abstraction not available - also moved back
-        return [(0.25, -0.15), (0.25, -0.05), (0.25, 0.05), (0.25, 0.15),
-                (0.30, -0.15), (0.30, -0.05), (0.30, 0.05), (0.30, 0.15),
-                (0.35, -0.15), (0.35, -0.05), (0.35, 0.05), (0.35, 0.15)]
+        # Fallback if abstraction not available - also with tight spacing
+        return [(0.2775, -0.0675), (0.2775, -0.0225), (0.2775, 0.0225), (0.2775, 0.0675),
+                (0.3225, -0.0675), (0.3225, -0.0225), (0.3225, 0.0225), (0.3225, 0.0675),
+                (0.3675, -0.0675), (0.3675, -0.0225), (0.3675, 0.0225), (0.3675, 0.0675)]
 
 # Pattern: X T T X / T X X T / X T T X
 # Where X = empty, T = 2-block tower
