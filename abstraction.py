@@ -980,7 +980,7 @@ def calculate_2x2_grid_positions(center=(0.525, 0.0), spacing=0.15):
     ]
 
 
-def check_spatial_constraints(blocks_state, spatial_goals, position_tolerance=0.03):
+def check_spatial_constraints(blocks_state, spatial_goals, position_tolerance=0.005):
     """
     Verify blocks are at specified (x, y) positions for Goal 4
     
