@@ -615,36 +615,17 @@ class PlannerInterface:
             # 4. Detach object AFTER settling (moved from before)
             # Save reference before detaching
             placed_block = self.attached_object
-            self.attached_object = None
-            gs.logger.info("Detached object")
             
-            # 5. Retract straight up SLOWLY
-            gs.logger.info("Retracting...")
-            for i in range(num_steps + 1):
-                alpha = i / num_steps
-                waypoint = (1-alpha) * qpos_place + alpha * qpos_preplace
-                waypoint[-2:] = 0.04  # Keep gripper open
-                self.robot.control_dofs_position(waypoint)
-                self.scene.step()
-            
-            # 6. Let physics settle and verify position
+            # 5. Let physics settle FIRST (CRITICAL - before retraction!)
             # For Goal 4A: spacing=0.045m, tolerance must be very tight (0.005m = 5mm)
-            
-            # Save reference before detaching (already done above)
-            
-            # ALWAYS verify if we have XY coordinates (len(target_pos) == 3)
-            # Check if this looks like spatial positioning based on target
-            placed_at_specific_xy = True  # Assume yes if put_down was called
-            
             gs.logger.info("="*60)
             gs.logger.info(f"PUT-DOWN VERIFICATION - Target: ({target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f})")
-            
-            # Always do extra settling for spatial goals
             gs.logger.info("Settling physics (500 steps for tight spacing)...")
+            
             for _ in range(500):  # Much longer for tight grids
                 self.scene.step()
             
-            # Verify position
+            # 6. VERIFY POSITION (before detaching/retracting!)
             if placed_block:
                 final_pos = placed_block.get_pos()
                 dx = abs(final_pos[0] - target_pos[0])
@@ -652,13 +633,7 @@ class PlannerInterface:
                 dz = abs(final_pos[2] - target_pos[2])
                 
                 # For Goal 4A with spacing=0.045m (4.5cm), tolerance must be 0.005m (5mm)
-                # This is VERY tight but necessary for blocks almost touching
                 TIGHT_TOLERANCE = 0.005  # 5mm for Goal 4A
-                LOOSE_TOLERANCE = 0.03   # 30mm for normal goals
-                
-                # Use tight tolerance if spacing is small
-                # Heuristic: if blocks are close together, target positions will be close
-                # For now, always use tight tolerance
                 tolerance = TIGHT_TOLERANCE
                 
                 gs.logger.info(f"Final position: ({final_pos[0]:.4f}, {final_pos[1]:.4f}, {final_pos[2]:.4f})")
@@ -672,11 +647,79 @@ class PlannerInterface:
                     gs.logger.error(f"   Error:   ({dx*1000:.2f}mm, {dy*1000:.2f}mm)")
                     gs.logger.error(f"   Limit:   {tolerance*1000:.1f}mm")
                     gs.logger.info("="*60)
-                    # Return False to trigger replan
-                    return False
+                    
+                    # IMMEDIATE REPOSITIONING - Don't retract, pick up and try again!
+                    gs.logger.warning("Attempting immediate repositioning...")
+                    
+                    # Close gripper to re-grasp (still above block)
+                    qpos_place[-2:] = 0.005
+                    for _ in range(50):
+                        self.robot.control_dofs_position(qpos_place)
+                        self.scene.step()
+                    
+                    # Re-attach for repositioning
+                    self.attached_object = placed_block
+                    
+                    # Lift slightly
+                    gs.logger.info("Lifting for repositioning...")
+                    qpos_lift = qpos_preplace.copy()
+                    qpos_lift[-2:] = 0.005
+                    for i in range(100):
+                        alpha = i / 100
+                        waypoint = (1-alpha) * qpos_place + alpha * qpos_lift
+                        waypoint[-2:] = 0.005
+                        self.robot.control_dofs_position(waypoint)
+                        self.scene.step()
+                    
+                    # Try placing again with more precision
+                    gs.logger.info("Attempting corrected placement...")
+                    for i in range(150):
+                        alpha = i / 150
+                        waypoint = (1-alpha) * qpos_lift + alpha * qpos_place
+                        waypoint[-2:] = 0.005
+                        self.robot.control_dofs_position(waypoint)
+                        self.scene.step()
+                    
+                    # Open gripper
+                    qpos_place[-2:] = 0.04
+                    for _ in range(50):
+                        self.robot.control_dofs_position(qpos_place)
+                        self.scene.step()
+                    
+                    # Settle again
+                    for _ in range(500):
+                        self.scene.step()
+                    
+                    # Check again
+                    final_pos2 = placed_block.get_pos()
+                    dx2 = abs(final_pos2[0] - target_pos[0])
+                    dy2 = abs(final_pos2[1] - target_pos[1])
+                    
+                    gs.logger.info(f"After repositioning: error=({dx2*1000:.2f}mm, {dy2*1000:.2f}mm)")
+                    
+                    if dx2 > tolerance or dy2 > tolerance:
+                        gs.logger.error("Still exceeds tolerance after repositioning!")
+                        self.attached_object = None
+                        # Don't retract - just fail
+                        return False
+                    else:
+                        gs.logger.info("✓ Repositioning successful!")
                 else:
                     gs.logger.info(f"✓ Position within tolerance ({tolerance*1000:.1f}mm)")
                     gs.logger.info("="*60)
+            
+            # 7. NOW detach and retract (only if position is good)
+            self.attached_object = None
+            gs.logger.info("Detached object")
+            
+            # 8. Retract straight up SLOWLY (directly upward)
+            gs.logger.info("Retracting straight up...")
+            for i in range(num_steps + 1):
+                alpha = i / num_steps
+                waypoint = (1-alpha) * qpos_place + alpha * qpos_preplace
+                waypoint[-2:] = 0.04  # Keep gripper open
+                self.robot.control_dofs_position(waypoint)
+                self.scene.step()
             
             gs.logger.info("Put-down completed successfully")
             return True
