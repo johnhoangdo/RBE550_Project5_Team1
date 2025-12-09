@@ -172,6 +172,7 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
 def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_state):
     """
     CRITICAL FIX: Prepend ALL positioning actions at START (not inline!)
+    ALSO: Always put down currently held block first!
     
     This prevents consecutive pick-ups which violate blocksworld constraints.
     """
@@ -184,6 +185,11 @@ def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_s
     
     print("\n[SPATIAL] Augmenting plan with positioning moves...")
     
+    # CRITICAL: Check if robot is currently holding a block that needs positioning
+    held_block_name = None
+    if "holding" in current_state and current_state["holding"]:
+        held_block_name = current_state["holding"][0]
+    
     # Step 1: Find ALL base blocks that will be stacked on
     for action in plan:
         if action[0] == "stack" and len(action) >= 3:
@@ -191,7 +197,16 @@ def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_s
             if bottom_block in spatial_targets:
                 blocks_to_position.add(bottom_block)
     
-    # Step 2: Create positioning for each base block
+    # Step 2: If holding a block that needs positioning, put it down FIRST!
+    if held_block_name and held_block_name in spatial_targets:
+        target_pos = spatial_targets[held_block_name]
+        print(f"  [HELD] Putting down {held_block_name} to ({target_pos[0]:.3f}, {target_pos[1]:.3f})")
+        positioning_actions.append(("put-down", held_block_name,
+                                   str(target_pos[0]), str(target_pos[1])))
+        # Remove from blocks_to_position since we're handling it now
+        blocks_to_position.discard(held_block_name)
+    
+    # Step 3: Create positioning for remaining base blocks
     for bottom_block in sorted(blocks_to_position):  # Sort for deterministic order
         target_pos = spatial_targets[bottom_block]
         current_pos = blocks_state[bottom_block].get_pos()
@@ -204,10 +219,13 @@ def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_s
             positioning_actions.append(("put-down", bottom_block,
                                        str(target_pos[0]), str(target_pos[1])))
     
-    if blocks_to_position:
-        print(f"[SPATIAL] Positioned {len(blocks_to_position)} blocks: {blocks_to_position}")
+    if blocks_to_position or held_block_name:
+        all_positioned = blocks_to_position.copy()
+        if held_block_name and held_block_name in spatial_targets:
+            all_positioned.add(held_block_name)
+        print(f"[SPATIAL] Positioned {len(all_positioned)} blocks: {all_positioned}")
     
-    # Step 3: Return positioning FIRST, then original plan
+    # Step 4: Return positioning FIRST, then original plan
     return positioning_actions + plan
 
 
