@@ -58,17 +58,7 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
     """
     Execute one symbolic action (pick-up, put-down, stack, unstack)
     using PlannerInterface primitives.
-
-    Args:
-        action_tuple: tuple like ('pick-up','r') or ('stack','r','g')
-        planner: PlannerInterface instance (handles OMPL + motion)
-        scene: Genesis scene
-        blocks_state: dict {name:block_entity}
-    
-    Returns:
-        bool: True if action succeeded, False otherwise
     """
-    # Normalize action name (handle both pick-up and pick_up)
     act = action_tuple[0].lower().replace("_", "-")
     args = list(action_tuple[1:])
     
@@ -105,27 +95,22 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
                 print("[WARN] Nothing to put down")
                 return False
             
-            # Find name of held object
             block_name = None
             for name, block in blocks_state.items():
                 if block == held_obj:
                     block_name = name
                     break
             
-            # Check if target position specified (for Goal 4 spatial)
             if len(args) >= 3:
-                # Format: put-down block x y
                 try:
                     target_x = float(args[1])
                     target_y = float(args[2])
                     target_pos = np.array([target_x, target_y, 0.02])
                     print(f"  Target position: ({target_x:.3f}, {target_y:.3f})")
                 except (ValueError, IndexError):
-                    # Fallback to current position
                     pos = held_obj.get_pos()
                     target_pos = np.array([pos[0], pos[1], 0.02])
             else:
-                # Place on table at current XY position
                 pos = held_obj.get_pos()
                 target_pos = np.array([pos[0], pos[1], 0.02])
             
@@ -143,8 +128,8 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
                 print("[ERROR] stack requires 2 arguments")
                 return False
             
-            block_a_name = args[0]  # Block to stack (should be held)
-            block_b_name = args[1]  # Block to stack on
+            block_a_name = args[0]
+            block_b_name = args[1]
             
             if block_b_name not in blocks_state:
                 print(f"[ERROR] Target block '{block_b_name}' not found")
@@ -152,7 +137,6 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             
             block_b = blocks_state[block_b_name]
             
-            # Verify we're holding the right block
             held_obj = planner.attached_object
             if held_obj is None:
                 print(f"[WARN] Not holding {block_a_name}, trying to pick it up first...")
@@ -168,9 +152,6 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             
             if success:
                 print(f" Successfully stacked {block_a_name} on {block_b_name}")
-                
-                # Check stability
-                # Build tower from bottom up
                 tower = [block_b_name, block_a_name]
                 if not check_tower_stable(blocks_state, tower):
                     print(f"  ⚠ Warning: Tower may be unstable!")
@@ -184,16 +165,14 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
                 print("[ERROR] unstack requires 2 arguments")
                 return False
             
-            block_a_name = args[0]  # Block to unstack
-            block_b_name = args[1]  # Block it's on
+            block_a_name = args[0]
+            block_b_name = args[1]
             
             if block_a_name not in blocks_state:
                 print(f"[ERROR] Block '{block_a_name}' not found")
                 return False
             
             block_a = blocks_state[block_a_name]
-            
-            # Unstack is essentially pick_up
             success = planner.pick_up(block_a)
             
             if success:
@@ -215,25 +194,6 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
 
 
 def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_state):
-    """
-    For Goal 4: Insert positioning moves at the START of the plan
-    
-    Strategy:
-    1. Identify all base blocks that need positioning
-    2. Add pick-up/put-down actions for each at the START
-    3. Then execute the original stacking plan
-    
-    This ensures blocks are positioned BEFORE any stacking happens.
-    
-    Args:
-        plan: Original symbolic plan from PDDL
-        current_state: Current symbolic state
-        goal_predicates: Goal with spatial constraints
-        blocks_state: Block entities for position checking
-    
-    Returns:
-        Augmented plan with positioning moves at the beginning
-    """
     if "spatial" not in goal_predicates:
         return plan
     
@@ -242,7 +202,6 @@ def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_s
     
     print("\n[SPATIAL] Augmenting plan with positioning moves...")
     
-    # Find all blocks that need positioning
     blocks_to_position = set()
     for action in plan:
         if action[0] == "stack" and len(action) >= 3:
@@ -250,25 +209,17 @@ def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_s
             if bottom_block in spatial_targets:
                 blocks_to_position.add(bottom_block)
     
-    # Create positioning moves for each block
     for bottom_block in blocks_to_position:
         target_pos = spatial_targets[bottom_block]
-        
-        # Check current position
         current_pos = blocks_state[bottom_block].get_pos()
         distance = ((current_pos[0] - target_pos[0])**2 + 
                    (current_pos[1] - target_pos[1])**2)**0.5
         
-        # If block is far from target (>5cm), add positioning moves
         if distance > 0.05:
-            print(f"  Positioning {bottom_block} to {target_pos}")
             positioning_actions.append(("pick-up", bottom_block))
-            positioning_actions.append(("put-down", bottom_block, 
+            positioning_actions.append(("put-down", bottom_block,
                                        str(target_pos[0]), str(target_pos[1])))
     
-    print(f"[SPATIAL] Positioned {len(blocks_to_position)} blocks: {blocks_to_position}")
-    
-    # Return: positioning moves FIRST, then original plan
     return positioning_actions + plan
 
 
@@ -277,283 +228,145 @@ def tamp_loop(scene, robot, blocks_state,
               domain_file="blocksworld_domain.pddl",
               max_iterations=10,
               use_spatial=False,
-              planning_timeout=30):  # NEW parameter
-    """
-    Full TAMP execution loop with replanning.
+              planning_timeout=30):
 
-    Steps:
-      1. Symbolic abstraction (compute predicates)
-      2. Check if goal achieved (with spatial constraints for Goal 4)
-      3. Task planning (PDDL → high-level actions)
-      4. Validate plan
-      5. Execute plan step-by-step
-      6. Check stability and replan if needed
-
-    Args:
-        scene: Genesis scene
-        robot: Franka robot entity (or RobotAdapter)
-        blocks_state: dict {block_name: block_entity}
-        goal_predicates: goal definition from goals.py
-        domain_file: path to blocksworld_domain.pddl
-        max_iterations: maximum planning iterations before giving up
-        use_spatial: if True, check spatial constraints (Goal 4)
-        planning_timeout: timeout for PDDL planner in seconds
-    
-    Returns:
-        bool: True if goal achieved, False if failed
-    """
-    print("\n" + "="*60)
-    print("STARTING TAMP LOOP".center(60))
-    if use_spatial:
-        print("(with spatial constraint checking)".center(60))
-    print("="*60)
-    print(f"Planning timeout: {planning_timeout}s")
-    
-    # Create planner interface
     planner_interface = PlannerInterface(robot, scene)
     iteration = 0
 
     while iteration < max_iterations:
         iteration += 1
-        print(f"\n{'='*60}")
-        print(f"ITERATION {iteration}/{max_iterations}".center(60))
-        print('='*60)
 
-        # =====================================================================
-        # STEP 1: SYMBOLIC ABSTRACTION (Lifting)
-        # =====================================================================
-        print("\n[STEP 1] Symbolic Abstraction...")
         current_state = compute_predicates(robot, blocks_state, scene)
-        visualize_predicates(current_state, f"Current State (Iteration {iteration})")
-        
-        # Display current towers
-        towers = get_all_towers(current_state)
-        if towers:
-            print(f"\nCurrent towers ({len(towers)}):")
-            for i, tower in enumerate(towers, 1):
-                print(f"  Tower {i}: {' -> '.join(tower)} (height: {len(tower)})")
 
-        # =====================================================================
-        # STEP 2: CHECK GOAL (with spatial constraints for Goal 4)
-        # =====================================================================
-        print("\n[STEP 2] Checking goal...")
-        
         if use_spatial:
-            # Goal 4: Check both predicates AND spatial constraints
             goal_met = goal_achieved_with_spatial(
-                current_state, 
-                goal_predicates, 
-                blocks_state
+                current_state, goal_predicates, blocks_state
             )
         else:
-            # Goals 1-3: Check predicates only
             goal_met = goal_achieved(current_state, goal_predicates)
         
         if goal_met:
-            print("\n" + "="*60)
-            print("✓ GOAL ACHIEVED!".center(60))
-            if use_spatial:
-                print("(Including spatial constraints)".center(60))
-            print("="*60)
+            print("✓ GOAL ACHIEVED!")
             return True
 
-        # =====================================================================
-        # STEP 3: TASK PLANNING
-        # =====================================================================
-        print("\n[STEP 3] Task Planning...")
-        
-        # Filter out spatial constraints for PDDL (they're not symbolic predicates)
         goal_pddl = {k: v for k, v in goal_predicates.items() if k != "spatial"}
-        
+
         problem_file = generate_pddl_problem(
-            current_state, 
-            goal_pddl,  # Use filtered goal (no spatial key)
-            filename="current_problem.pddl",
-            problem_name=f"tamp-iteration-{iteration}"
+            current_state, goal_pddl, "current_problem.pddl"
         )
-        
-        print(f"  Generated problem file: {problem_file}")
-        
-        # Call planner with timeout (longer for complex goals)
-        plan = call_planner(domain_file, problem_file, 
-                           use_pyperplan=True, 
+
+        plan = call_planner(domain_file, problem_file,
+                           use_pyperplan=True,
                            timeout=planning_timeout)
-        
+
         if not plan:
-            print("\n✗ No plan found. Unable to achieve goal.")
             return False
 
-        # Parse and validate plan
         plan = parse_plan_output(plan)
-        
-        # For Goal 4: Insert positioning moves to satisfy spatial constraints
+
         if use_spatial and "spatial" in goal_predicates:
             plan = augment_plan_with_positioning(
                 plan, current_state, goal_predicates, blocks_state
             )
-        
-        print(f"\n  Generated plan with {len(plan)} actions:")
-        for i, step in enumerate(plan, 1):
-            action = step[0]
-            args = ' '.join(step[1:])
-            print(f"    {i}. {action} {args}")
-        
-        # Validate plan before execution
-        print("\n  Validating plan...")
-        is_valid, error = validate_plan(plan, current_state, goal_predicates)
-        if not is_valid:
-            print(f" Warning: Plan validation failed: {error}")
-            print("  Proceeding anyway (validation may be overly strict)")
 
-        # =====================================================================
-        # STEP 4: EXECUTE PLAN
-        # =====================================================================
-        print("\n[STEP 4] Executing Plan...")
-        
-        execution_failed = False
-        for i, action in enumerate(plan, 1):
-            print(f"\n--- Action {i}/{len(plan)} ---")
-            
-            success = execute_primitive(action, planner_interface, scene, blocks_state)
-            
-            if not success:
-                print(f"\n  Action {action} failed. Will replan...")
-                execution_failed = True
+        for action in plan:
+            if not execute_primitive(action, planner_interface, scene, blocks_state):
                 break
-            
-            # Let physics settle after each action
-            print("  Settling physics...")
-            for _ in range(300):
-                scene.step()
         
-        if execution_failed:
-            print("\n Execution failed, replanning...")
-            continue  # Go to next iteration
+    return False
 
-        # =====================================================================
-        # STEP 5: VERIFY EXECUTION
-        # =====================================================================
-        print("\n[STEP 5] Verifying execution...")
-        
-        # Let physics fully settle
+
 def main():
-    """
-    Main entry point with support for Goals 3, 3 Extended, and 4
-    
-    Command-line arguments:
-        gpu              - Use GPU backend instead of CPU
-        --goal3-ext      - Goal 3 Extended mode (10+ blocks)
-        --goal4a         - Goal 4A: Tower Grid (12 yellow blocks)
-        --goal4b         - Goal 4B: Adjacent (3 red + 3 green)
-    """
     print("\n" + "="*60)
     print("PROJECT 5: TASK AND MOTION PLANNING (TAMP)".center(60))
     print("Building Towers with Symbolic Planning".center(60))
     print("="*60)
     
-    # Parse arguments
     use_gpu = "gpu" in sys.argv
+    use_goal1 = "--goal1" in sys.argv or "--two-towers" in sys.argv   # ✅ NEW
+    use_goal2 = "--goal2" in sys.argv or "--five-tower" in sys.argv   # ✅ NEW
+    use_goal3 = "--goal3" in sys.argv or "--six-tower" in sys.argv   # ✅ NEW
     use_goal3_extended = "--goal3-ext" in sys.argv
     use_goal4a = "--goal4a" in sys.argv or "--tower-grid" in sys.argv
     use_goal4a_simple = "--goal4a-simple" in sys.argv or "--test" in sys.argv
     use_goal4b = "--goal4b" in sys.argv or "--adjacent" in sys.argv
     
-    # Configure mode
-    if use_goal3_extended:
-        print("\n[MODE] Goal 3 Extended (10+ blocks) - Extreme Difficulty")
-        import abstraction, planning
-        abstraction.set_goal_mode('goal3_extended')
-        planning.set_planning_mode('goal3_extended')
+    # ✅ MODE SELECTION
+    if use_goal1:
+        print("\n[MODE] Goal 1: Two 3-Block Towers")
+        max_iterations = 10
+        planning_timeout = 20
+    elif use_goal2:   # ✅ NEW
+        print("\n[MODE] Goal 2: Five-Block Tower")
+        max_iterations = 12
+        planning_timeout = 25
+    elif use_goal3:   # ✅ NEW
+        print("\n[MODE] Goal 3: Single 6-Block Tall Tower")
+        max_iterations = 10
+        planning_timeout = 30
+    elif use_goal3_extended:
+        print("\n[MODE] Goal 3 Extended (10+ blocks)")
         max_iterations = 30
-        planning_timeout = 60  # Longer timeout for complex goals
+        planning_timeout = 60
     elif use_goal4a or use_goal4b:
-        print("\n[MODE] Goal 4 - Spatial Grid Structures")
+        print("\n[MODE] Goal 4 - Spatial Grid")
         max_iterations = 15
-        planning_timeout = 90  # Much longer timeout for 12-block planning
+        planning_timeout = 90
     else:
         print("\n[MODE] Goal 3 (6-block tower)")
         max_iterations = 10
-        planning_timeout = 30  # Default timeout
+        planning_timeout = 30
     
-    # Initialize Genesis
-    print("\n[INIT] Initializing Genesis simulator...")
     if use_gpu:
         gs.init(backend=gs.gpu, logging_level='Warning', logger_verbose_time=False)
     else:
         gs.init(backend=gs.cpu, logging_level='Warning', logger_verbose_time=False)
     
-    # Create scene
-    print("\n[INIT] Creating scene...")
-    if use_goal4a:
+    # ✅ SCENE SELECTION
+    if use_goal1:
+        scene, franka, blocks_state = create_scene_6blocks()
+        goal_name_str = "two_towers"
+        goal_description = "Goal 1: Two 3-Block Towers"
+        use_spatial = False
+    elif use_goal2:   # ✅ NEW
+        scene, franka, blocks_state = create_scene_6blocks()
+        goal_name_str = "five_tower"
+        goal_description = "Goal 2: Five-Block Tower"
+        use_spatial = False
+    elif use_goal3:   # ✅ NEW
+        scene, franka, blocks_state = create_scene_6blocks()
+        goal_name_str = "six_tower"
+        goal_description = "Goal 3: Single 6-Block Tall Tower"
+        use_spatial = False
+    elif use_goal4a:
         scene, franka, blocks_state = create_scene_12_yellow_blocks()
         goal_name_str = "tower_grid"
-        goal_description = "Goal 4A: Tower Grid (12 yellow)"
-        use_spatial = True
-    elif use_goal4a_simple:
-        # Use regular 6-block scene but only use 4 blocks
-        scene, franka, blocks_state = create_scene_6blocks()
-        # Rename blocks to y1-y4
-        blocks_renamed = {
-            "y1": blocks_state["y"],
-            "y2": blocks_state["m"],
-            "y3": blocks_state["c"],
-            "y4": blocks_state["r"],
-        }
-        blocks_state = blocks_renamed
-        goal_name_str = "tower_grid_simple"
-        goal_description = "Goal 4A-Simple: 2 Towers (4 blocks TEST)"
+        goal_description = "Goal 4A"
         use_spatial = True
     elif use_goal4b:
         scene, franka, blocks_state = create_scene_3red_3green()
         goal_name_str = "adjacent"
-        goal_description = "Goal 4B: Adjacent (3R+3G)"
+        goal_description = "Goal 4B"
         use_spatial = True
     else:
         scene, franka, blocks_state = create_scene_6blocks()
         goal_name_str = "six_tower"
-        goal_description = "Goal 3: Six-Block Tower"
+        goal_description = "Goal 3"
         use_spatial = False
     
-    print(f"  Created {len(blocks_state)} blocks: {', '.join(sorted(blocks_state.keys()))}")
-    
-    # Set control gains
-    print("\n[INIT] Setting robot control gains...")
-    franka.set_dofs_kp(np.array([1800, 1800, 1400, 1400, 800, 800, 800, 200, 200]))
-    franka.set_dofs_kv(np.array([180, 180, 140, 140, 80, 80, 80, 20, 20]))
-    franka.set_dofs_force_range(
-        np.array([-87, -87, -87, -87, -12, -12, -12, -100, -100]),
-        np.array([87, 87, 87, 87, 12, 12, 12, 100, 100])
-    )
-    
-    # Select goal
-    print("\n[INIT] Selecting goal...")
     goal = get_goal(goal_name_str)
-    print(f"  Goal: {goal_description}")
-    visualize_predicates(goal, "Goal Configuration")
-    
-    if use_spatial and "spatial" in goal:
-        print(f"\n  Spatial constraints: {len(goal['spatial'])} blocks")
-    
-    # Run TAMP
+
     success = tamp_loop(
         scene=scene,
         robot=franka,
         blocks_state=blocks_state,
         goal_predicates=goal,
-        domain_file="blocksworld_domain.pddl",
         max_iterations=max_iterations,
         use_spatial=use_spatial,
         planning_timeout=planning_timeout
     )
     
-    # Report
-    print("\n" + "="*60)
-    if success:
-        print(f"✓ SUCCESS! {goal_description}".center(60))
-    else:
-        print("✗ FAILED. Goal not achieved.".center(60))
-    print("="*60)
-    
+    print("SUCCESS" if success else "FAILED")
     return success
 
 
