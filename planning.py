@@ -660,10 +660,14 @@ class PlannerInterface:
                     # Re-attach for repositioning
                     self.attached_object = placed_block
                     
-                    # Lift slightly
+                    # Lift slightly - use .clone() for tensors, .copy() for numpy
                     gs.logger.info("Lifting for repositioning...")
-                    qpos_lift = qpos_preplace.copy()
+                    if hasattr(qpos_preplace, 'clone'):  # PyTorch tensor
+                        qpos_lift = qpos_preplace.clone()
+                    else:  # Numpy array
+                        qpos_lift = qpos_preplace.copy()
                     qpos_lift[-2:] = 0.005
+                    
                     for i in range(100):
                         alpha = i / 100
                         waypoint = (1-alpha) * qpos_place + alpha * qpos_lift
@@ -699,8 +703,37 @@ class PlannerInterface:
                     
                     if dx2 > tolerance or dy2 > tolerance:
                         gs.logger.error("Still exceeds tolerance after repositioning!")
-                        self.attached_object = None
-                        # Don't retract - just fail
+                        
+                        # CRITICAL: Pick up the misplaced block so replanner can try again!
+                        # Don't leave it in the wrong position!
+                        gs.logger.warning("Picking up misplaced block to allow repositioning on replan...")
+                        
+                        # Close gripper to grasp the block
+                        if hasattr(qpos_place, 'clone'):
+                            qpos_grasp = qpos_place.clone()
+                        else:
+                            qpos_grasp = qpos_place.copy()
+                        qpos_grasp[-2:] = 0.005  # Close gripper
+                        
+                        for _ in range(50):
+                            self.robot.control_dofs_position(qpos_grasp)
+                            self.scene.step()
+                        
+                        # Re-attach the block (we're holding it now)
+                        self.attached_object = placed_block
+                        gs.logger.info("Block re-grasped - will be held for replanning")
+                        
+                        # Lift to safe height
+                        for i in range(num_steps + 1):
+                            alpha = i / num_steps
+                            waypoint = (1-alpha) * qpos_grasp + alpha * qpos_preplace
+                            waypoint[-2:] = 0.005  # Keep closed
+                            self.robot.control_dofs_position(waypoint)
+                            self.scene.step()
+                        
+                        # Return False - robot is now holding the block
+                        # Replanner will see hand NOT empty and can try put-down again
+                        gs.logger.info("Holding misplaced block - ready for replan")
                         return False
                     else:
                         gs.logger.info("✓ Repositioning successful!")
