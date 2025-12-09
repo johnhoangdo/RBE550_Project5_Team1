@@ -650,7 +650,7 @@ class PlannerInterface:
                         f"error=({dx*100:.1f}cm, {dy*100:.1f}cm)"
                     )
                     
-                    if dx > 0.03 or dy > 0.03:  # 3cm tolerance
+                    if dx > 0.005 or dy > 0.005:  # 0.5cm tolerance
                         gs.logger.warning(
                             f"Position error exceeds tolerance! May need repositioning."
                         )
