@@ -820,451 +820,130 @@ def compare_states(current_preds, goal_preds):
 
 
 # ============================================================
-# GOAL 3 & 4 EXTENSIONS
-# Added: December 2024 for Goals 3, 3 Extended, and 4
+# SPATIAL CONSTRAINT FUNCTIONS (Goal 4)
 # ============================================================
 
-# Configuration mode tracking
-_CURRENT_MODE = 'goal3'  # Default is Goal 3 mode (current constants above)
-
-
-def set_goal_mode(mode='goal3'):
+def calculate_grid_positions(center, spacing, grid_shape):
     """
-    Switch parameter configuration for different goals
+    Calculate positions for a rectangular grid of blocks
     
     Args:
-        mode: Configuration mode string
-            - 'default': Goals 1-2 (relaxed: 2cm tolerance, 100 steps)
-            - 'goal3': Goal 3 - 6 blocks (tight: 1cm tolerance, 300 steps) [CURRENT]
-            - 'goal3_extended': 10+ blocks (tighter: 0.8cm tolerance, 500 steps)
-    
-    Usage:
-        import abstraction
-        abstraction.set_goal_mode('goal3_extended')
-    
-    Notes:
-        - Current file defaults to Goal 3 mode (constants already set above)
-        - Call this function to switch to other modes if needed
-    """
-    global XY_ALIGNMENT_THRESHOLD, Z_MIN_SEPARATION, Z_MAX_SEPARATION
-    global STABILITY_XY_THRESHOLD, _CURRENT_MODE
-    
-    if mode == 'goal3_extended':
-        # Even tighter tolerances for 10+ block towers
-        XY_ALIGNMENT_THRESHOLD = 0.008   # 8mm
-        Z_MIN_SEPARATION = 0.039         # 3.9cm
-        Z_MAX_SEPARATION = 0.041         # 4.1cm
-        STABILITY_XY_THRESHOLD = 0.008   # 8mm
-        print('\n' + '='*60)
-        print('[Abstraction] Goal 3 Extended mode (10+ blocks)'.center(60))
-        print('⚠ WARNING: Success rate <20% for 10+ blocks'.center(60))
-        print('='*60)
-        print(f'  XY Alignment:  {XY_ALIGNMENT_THRESHOLD*1000:.1f}mm')
-        print(f'  Z Separation:  {Z_MIN_SEPARATION*100:.1f}-{Z_MAX_SEPARATION*100:.1f}cm')
-        print(f'  Stability:     {STABILITY_XY_THRESHOLD*1000:.1f}mm')
-        print('='*60 + '\n')
-        _CURRENT_MODE = 'goal3_extended'
-        
-    elif mode == 'default':
-        # Relaxed tolerances for Goals 1-2
-        XY_ALIGNMENT_THRESHOLD = 0.020   # 2cm
-        Z_MIN_SEPARATION = 0.035         # 3.5cm
-        Z_MAX_SEPARATION = 0.045         # 4.5cm
-        STABILITY_XY_THRESHOLD = 0.025   # 2.5cm
-        print('\n' + '='*60)
-        print('[Abstraction] Default mode (Goals 1-2)'.center(60))
-        print('='*60)
-        print(f'  XY Alignment:  {XY_ALIGNMENT_THRESHOLD*100:.1f}cm')
-        print(f'  Z Separation:  {Z_MIN_SEPARATION*100:.1f}-{Z_MAX_SEPARATION*100:.1f}cm')
-        print(f'  Stability:     {STABILITY_XY_THRESHOLD*100:.1f}cm')
-        print('='*60 + '\n')
-        _CURRENT_MODE = 'default'
-        
-    else:  # 'goal3' - already configured at top of file
-        print('\n' + '='*60)
-        print('[Abstraction] Goal 3 mode (6 blocks)'.center(60))
-        print('Current configuration (already set)'.center(60))
-        print('='*60)
-        print(f'  XY Alignment:  {XY_ALIGNMENT_THRESHOLD*100:.1f}cm')
-        print(f'  Z Separation:  {Z_MIN_SEPARATION*100:.1f}-{Z_MAX_SEPARATION*100:.1f}cm')
-        print(f'  Stability:     {STABILITY_XY_THRESHOLD*100:.1f}cm')
-        print('='*60 + '\n')
-        _CURRENT_MODE = 'goal3'
-
-
-def get_current_mode():
-    """
-    Get current configuration mode
+        center: (x, y) center of grid
+        spacing: Distance between adjacent positions (meters)
+        grid_shape: (rows, cols) grid dimensions
     
     Returns:
-        str: Current mode ('default', 'goal3', or 'goal3_extended')
-    """
-    return _CURRENT_MODE
-
-
-# ============================================================
-# GOAL 4: SPATIAL CONSTRAINT CHECKING
-# Functions for spatial grid structures with position constraints
-# ============================================================
-
-def calculate_grid_positions(center=(0.50, 0.0), spacing=0.10, grid_shape=(3, 4)):
-    """
-    Calculate grid positions for tower bases in Goal 4
-    
-    Args:
-        center: (x, y) center point of grid in world coordinates
-        spacing: Distance between adjacent grid points in meters (10cm recommended)
-        grid_shape: (rows, cols) dimensions of grid
-    
-    Returns:
-        list: List of (x, y) tuples for each grid position
-    
-    Example:
-        >>> positions = calculate_grid_positions(spacing=0.10, grid_shape=(3, 4))
-        >>> len(positions)
-        12
-        >>> positions[0]  # First position
-        (0.45, -0.1)
-    
-    Notes:
-        - Grid is centered at the specified center point
-        - Positions are arranged row by row
-        - Useful for Goal 4A (Tower Grid Configuration)
+        List of (x, y) positions in row-major order
     """
     rows, cols = grid_shape
     positions = []
     
-    # Calculate offsets to center the grid
-    x_offset = (cols - 1) * spacing / 2.0
-    y_offset = (rows - 1) * spacing / 2.0
+    # Calculate starting position (top-left of grid)
+    start_x = center[0] - (cols - 1) * spacing / 2
+    start_y = center[1] - (rows - 1) * spacing / 2
     
     # Generate positions row by row
-    for i in range(rows):
-        for j in range(cols):
-            x = center[0] - x_offset + j * spacing
-            y = center[1] - y_offset + i * spacing
+    for row in range(rows):
+        for col in range(cols):
+            x = start_x + col * spacing
+            y = start_y + row * spacing
             positions.append((x, y))
     
     return positions
 
 
-def calculate_2x2_grid_positions(center=(0.525, 0.0), spacing=0.15):
+def calculate_2x2_grid_positions(center, spacing):
     """
-    Calculate 2×2 grid positions for Adjacent configuration
+    Calculate positions for 2×2 grid
     
     Args:
-        center: (x, y) center point
-        spacing: Distance between positions (15cm recommended for 4cm blocks)
+        center: (x, y) center of grid
+        spacing: Distance between positions (meters)
     
     Returns:
-        list: List of 4 (x, y) tuples arranged in 2×2 pattern
-    
-    Example:
-        >>> positions = calculate_2x2_grid_positions()
-        >>> len(positions)
-        4
-        >>> # Returns positions for:
-        >>> # [0]: bottom-left, [1]: bottom-right
-        >>> # [2]: top-left,    [3]: top-right
-    
-    Notes:
-        - Useful for Goal 4B (Adjacent Configuration)
-        - Positions form a square centered at center point
+        List of 4 (x, y) positions: [BL, TL, BR, TR]
     """
-    half_spacing = spacing / 2.0
+    half = spacing / 2
     return [
-        (center[0] - half_spacing, center[1] - half_spacing),  # Bottom-left
-        (center[0] - half_spacing, center[1] + half_spacing),  # Bottom-right
-        (center[0] + half_spacing, center[1] - half_spacing),  # Top-left
-        (center[0] + half_spacing, center[1] + half_spacing),  # Top-right
+        (center[0] - half, center[1] - half),  # Position 0: Bottom-left
+        (center[0] - half, center[1] + half),  # Position 1: Top-left  
+        (center[0] + half, center[1] - half),  # Position 2: Bottom-right
+        (center[0] + half, center[1] + half),  # Position 3: Top-right
     ]
 
 
-def check_spatial_constraints(blocks_state, spatial_goals, position_tolerance=0.005):
+def check_spatial_constraints(blocks_state, spatial_goals, tolerance=0.005):
     """
-    Verify blocks are at specified (x, y) positions for Goal 4
+    Check if blocks satisfy spatial position constraints
     
     Args:
-        blocks_state: Dictionary mapping block names to Genesis entities
-        spatial_goals: Dictionary mapping block_name -> (target_x, target_y)
-        position_tolerance: Allowed position error in meters (3cm default)
+        blocks_state: Dict mapping block names to block objects
+        spatial_goals: Dict mapping block names to target (x, y) positions
+        tolerance: Position tolerance in meters (default 0.005m = 5mm for Goal 4A)
     
     Returns:
-        bool: True if all spatial constraints satisfied
-    
-    Example:
-        spatial_goals = {
-            "y1": (0.50, 0.10),
-            "y2": (0.50, 0.20),
-            "y3": (0.60, 0.10)
-        }
-        result = check_spatial_constraints(blocks_state, spatial_goals)
-    
-    Notes:
-        - Only checks X and Y positions (not Z/height)
-        - Uses Manhattan distance (|dx| and |dy| both must be < tolerance)
-        - Prints detailed error messages for debugging
+        Tuple of (all_satisfied: bool, violations: list)
     """
-    for block_name, (target_x, target_y) in spatial_goals.items():
+    violations = []
+    
+    for block_name, target_pos in spatial_goals.items():
         if block_name not in blocks_state:
-            print(f"[Spatial] ✗ Block '{block_name}' not found in scene")
-            return False
+            violations.append(f"Block {block_name} not found in state")
+            continue
         
-        try:
-            # Get actual position
-            pos = blocks_state[block_name].get_pos()
-            actual_x, actual_y = pos[0], pos[1]
-            
-            # Calculate errors
-            dx = abs(actual_x - target_x)
-            dy = abs(actual_y - target_y)
-            distance = np.sqrt(dx**2 + dy**2)
-            
-            # Check tolerance (using Manhattan distance)
-            if dx > position_tolerance or dy > position_tolerance:
-                print(f"[Spatial] ✗ Block '{block_name}' out of position:")
-                print(f"  Actual:   ({actual_x:.3f}, {actual_y:.3f})")
-                print(f"  Target:   ({target_x:.3f}, {target_y:.3f})")
-                print(f"  Error:    dx={dx:.3f}m, dy={dy:.3f}m (total={distance:.3f}m)")
-                print(f"  Tolerance: {position_tolerance:.3f}m")
-                return False
-                
-        except Exception as e:
-            print(f"[Spatial] ✗ Error checking block '{block_name}': {e}")
-            return False
+        block = blocks_state[block_name]
+        current_pos = block.get_pos()
+        
+        # Check XY position (ignore Z)
+        dx = abs(current_pos[0] - target_pos[0])
+        dy = abs(current_pos[1] - target_pos[1])
+        
+        if dx > tolerance or dy > tolerance:
+            violations.append(
+                f"{block_name}: at ({current_pos[0]:.4f}, {current_pos[1]:.4f}), "
+                f"should be at ({target_pos[0]:.4f}, {target_pos[1]:.4f}), "
+                f"error: ({dx*1000:.2f}mm, {dy*1000:.2f}mm)"
+            )
     
-    print(f"[Spatial] ✓ All {len(spatial_goals)} blocks within {position_tolerance*100:.1f}cm tolerance")
-    return True
+    return (len(violations) == 0, violations)
 
 
-def goal_achieved_with_spatial(current_predicates, goal_predicates, 
-                               blocks_state, strict=True):
+def goal_achieved_with_spatial(current_state, goal_predicates, blocks_state):
     """
-    Extended goal checking with spatial constraints for Goal 4
-    
-    This function extends the standard goal_achieved() to also check
-    spatial position constraints specified in the goal.
+    Check if goal is achieved including spatial constraints
     
     Args:
-        current_predicates: Current symbolic state (on, ontable, clear, etc.)
-        goal_predicates: Goal specification (may include "spatial" key)
-        blocks_state: Block entities for position checking
-        strict: Whether to use strict predicate matching
+        current_state: Current symbolic state predicates
+        goal_predicates: Goal predicates (may include 'spatial' key)
+        blocks_state: Dict of block objects
     
     Returns:
-        bool: True if goal achieved (including spatial constraints)
-    
-    Example:
-        goal = {
-            "on": [("y1", "y2")],
-            "ontable": ["y2"],
-            "clear": ["y1"],
-            "spatial": {
-                "y2": (0.50, 0.10)  # y2 must be at this position
-            }
-        }
-        
-        # Check both predicates and spatial constraints
-        if goal_achieved_with_spatial(current, goal, blocks_state):
-            print("Goal 4 achieved!")
-    
-    Notes:
-        - First checks standard symbolic predicates (on, ontable, clear)
-        - Then checks spatial constraints if "spatial" key present in goal
-        - Both must be satisfied for goal to be achieved
-        - Use this instead of goal_achieved() for Goal 4
+        bool: True if goal fully achieved (symbolic + spatial)
     """
-    # First check standard symbolic predicates
-    if not goal_achieved(current_predicates, goal_predicates, strict):
+    # Check symbolic predicates first
+    if not goal_achieved(current_state, goal_predicates):
         return False
     
-    # Then check spatial constraints if present
+    # Check spatial constraints if present
     if "spatial" in goal_predicates:
-        print("[Goal] Checking spatial constraints...")
-        if not check_spatial_constraints(blocks_state, goal_predicates["spatial"]):
-            print("[Goal] ✗ Spatial constraints not satisfied")
+        print("\n" + "="*60)
+        print("[SPATIAL] Checking spatial constraints...")
+        print(f"[SPATIAL] Number of blocks to check: {len(goal_predicates['spatial'])}")
+        
+        spatial_satisfied, violations = check_spatial_constraints(
+            blocks_state, 
+            goal_predicates["spatial"],
+            tolerance=0.005  # 5mm for Goal 4A (tight spacing)
+        )
+        
+        if not spatial_satisfied:
+            print(f"[SPATIAL] ❌ Constraints NOT satisfied ({len(violations)} violations):")
+            for v in violations:
+                print(f"  {v}")
+            print("="*60)
             return False
-        print("[Goal] ✓ Spatial constraints satisfied")
+        else:
+            print("[SPATIAL] ✓ All spatial constraints satisfied (within 5mm tolerance)")
+            print("="*60)
     
     return True
-
-
-def get_color_from_name(block_name):
-    """
-    Extract color from block name (useful for Goal 4 color constraints)
-    
-    Args:
-        block_name: String like "r1", "g2", "y12"
-    
-    Returns:
-        str: Single character color code ('r', 'g', 'b', 'y', 'm', 'c')
-             or None if invalid
-    
-    Example:
-        >>> get_color_from_name("r1")
-        'r'
-        >>> get_color_from_name("g3")
-        'g'
-        >>> get_color_from_name("y12")
-        'y'
-    
-    Notes:
-        - Assumes block names follow convention: color + number
-        - First character is the color code
-        - Used for validating color constraints in Goal 4
-    """
-    if block_name and len(block_name) > 0:
-        return block_name[0]
-    return None
-
-
-def validate_color_constraints(predicates, color_rules):
-    """
-    Check if stacking follows color rules (optional for Goal 4)
-    
-    Args:
-        predicates: Current symbolic predicates
-        color_rules: Dictionary of color constraint rules
-            - "same_color_only": True = blocks can only stack on same color
-            - "alternating": True = colors must alternate
-            - "prohibited": [(color1, color2)] = color1 cannot be on color2
-    
-    Returns:
-        bool: True if all color rules satisfied
-    
-    Example:
-        color_rules = {
-            "same_color_only": True,
-            "prohibited": [("r", "g")]  # red cannot be on green
-        }
-        
-        predicates = {"on": [("r1", "r2"), ("g1", "g2")]}
-        result = validate_color_constraints(predicates, color_rules)
-        # Returns True (all red-on-red, green-on-green)
-    
-    Notes:
-        - Optional function for advanced Goal 4 variants
-        - Can enforce color-based stacking rules
-    """
-    for (top, bottom) in predicates.get("on", []):
-        top_color = get_color_from_name(top)
-        bottom_color = get_color_from_name(bottom)
-        
-        # Rule: Same color only
-        if color_rules.get("same_color_only", False):
-            if top_color != bottom_color:
-                print(f"[Color] ✗ Violation: {top} ({top_color}) on {bottom} ({bottom_color})")
-                print(f"        Rule: same_color_only")
-                return False
-        
-        # Rule: Alternating colors
-        if color_rules.get("alternating", False):
-            if top_color == bottom_color:
-                print(f"[Color] ✗ Violation: {top} ({top_color}) on {bottom} ({bottom_color})")
-                print(f"        Rule: colors must alternate")
-                return False
-        
-        # Rule: Prohibited combinations
-        prohibited = color_rules.get("prohibited", [])
-        if (top_color, bottom_color) in prohibited:
-            print(f"[Color] ✗ Violation: {top} ({top_color}) on {bottom} ({bottom_color})")
-            print(f"        Rule: {top_color} on {bottom_color} is prohibited")
-            return False
-    
-    print("[Color] ✓ All color constraints satisfied")
-    return True
-
-
-def validate_tower_heights(predicates, height_requirements):
-    """
-    Check if towers have required heights (optional for Goal 4)
-    
-    Args:
-        predicates: Current symbolic predicates
-        height_requirements: Dict mapping base_block -> required_height
-    
-    Returns:
-        bool: True if all height requirements met
-    
-    Example:
-        height_requirements = {
-            "r2": 2,  # Tower with base r2 must be height 2
-            "g2": 2,  # Tower with base g2 must be height 2
-            "g3": 1   # Tower with base g3 must be height 1
-        }
-        
-        result = validate_tower_heights(predicates, height_requirements)
-    
-    Notes:
-        - Uses get_tower_height() function (must be defined above)
-        - Useful for Goal 4B (Adjacent Configuration) with mixed heights
-        - Optional constraint for advanced Goal 4 variants
-    """
-    for base_block, required_height in height_requirements.items():
-        actual_height = get_tower_height(base_block, predicates)
-        
-        if actual_height != required_height:
-            print(f"[Height] ✗ Tower at '{base_block}' has height {actual_height}, "
-                  f"expected {required_height}")
-            return False
-    
-    print(f"[Height] ✓ All {len(height_requirements)} tower heights correct")
-    return True
-
-
-# ============================================================
-# USAGE EXAMPLES & TESTING
-# ============================================================
-
-if __name__ == "__main__":
-    """
-    Test the new Goal 3/4 functions
-    """
-    print("\n" + "="*70)
-    print("ABSTRACTION.PY - GOAL 3/4 EXTENSIONS TEST".center(70))
-    print("="*70)
-    
-    # Test 1: Mode switching
-    print("\n[TEST 1] Mode Switching:")
-    print("-" * 70)
-    set_goal_mode('goal3')
-    print(f"Current mode: {get_current_mode()}")
-    print(f"XY threshold: {XY_ALIGNMENT_THRESHOLD*1000:.1f}mm")
-    
-    # Test 2: Spatial grid calculations
-    print("\n[TEST 2] Spatial Grid Calculations:")
-    print("-" * 70)
-    grid_3x4 = calculate_grid_positions()
-    print(f"3×4 grid: {len(grid_3x4)} positions")
-    print(f"  First:  {grid_3x4[0]}")
-    print(f"  Middle: {grid_3x4[6]}")
-    print(f"  Last:   {grid_3x4[-1]}")
-    
-    grid_2x2 = calculate_2x2_grid_positions()
-    print(f"\n2×2 grid: {len(grid_2x2)} positions")
-    for i, pos in enumerate(grid_2x2):
-        print(f"  [{i}]: {pos}")
-    
-    # Test 3: Color extraction
-    print("\n[TEST 3] Color Extraction:")
-    print("-" * 70)
-    test_names = ["r1", "g3", "y12", "b5", "m2", "c1"]
-    for name in test_names:
-        color = get_color_from_name(name)
-        print(f"  {name:4s} -> '{color}'")
-    
-    # Test 4: Color constraints
-    print("\n[TEST 4] Color Constraint Validation:")
-    print("-" * 70)
-    test_predicates = {
-        "on": [("r1", "r2"), ("g1", "g2")]
-    }
-    color_rules = {"same_color_only": True}
-    result = validate_color_constraints(test_predicates, color_rules)
-    print(f"  Same-color stacking: {'PASS' if result else 'FAIL'}")
-    
-    print("\n" + "="*70)
-    print("ALL TESTS PASSED".center(70))
-    print("="*70)
-    print("\nNew functions ready for Goals 3, 3 Extended, and 4!")
-    print("="*70 + "\n")
