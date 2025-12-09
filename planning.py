@@ -511,7 +511,7 @@ class PlannerInterface:
             traceback.print_exc()
             return False
 
-    def put_down(self, target_pos, pre_place_height=0.20, place_offset=0.05):
+    def put_down(self, target_pos, pre_place_height=0.20, place_offset=0.08):
         """
         Place the currently held object at target position
         
@@ -627,39 +627,56 @@ class PlannerInterface:
                 self.robot.control_dofs_position(waypoint)
                 self.scene.step()
             
-            # 6. Let physics settle (LONGER for positioned blocks)
-            # Check if this is a spatial positioning (not just putting down anywhere)
-            is_spatial_placement = (
-                abs(target_pos[0]) > 0.01 and  # Not at origin
-                abs(target_pos[1]) > 0.01       # Not at origin
-            )
+            # 6. Let physics settle and verify position
+            # For Goal 4A: spacing=0.045m, tolerance must be very tight (0.005m = 5mm)
             
-            if is_spatial_placement:
-                gs.logger.info("Extra settling for positioned block...")
-                for _ in range(300):  # Much longer settling
-                    self.scene.step()
+            # Save reference before detaching (already done above)
+            
+            # ALWAYS verify if we have XY coordinates (len(target_pos) == 3)
+            # Check if this looks like spatial positioning based on target
+            placed_at_specific_xy = True  # Assume yes if put_down was called
+            
+            gs.logger.info("="*60)
+            gs.logger.info(f"PUT-DOWN VERIFICATION - Target: ({target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f})")
+            
+            # Always do extra settling for spatial goals
+            gs.logger.info("Settling physics (500 steps for tight spacing)...")
+            for _ in range(500):  # Much longer for tight grids
+                self.scene.step()
+            
+            # Verify position
+            if placed_block:
+                final_pos = placed_block.get_pos()
+                dx = abs(final_pos[0] - target_pos[0])
+                dy = abs(final_pos[1] - target_pos[1])
+                dz = abs(final_pos[2] - target_pos[2])
                 
-                # Verify position
-                if placed_block:
-                    final_pos = placed_block.get_pos()
-                    dx = abs(final_pos[0] - target_pos[0])
-                    dy = abs(final_pos[1] - target_pos[1])
-                    gs.logger.info(
-                        f"Position verification: target=({target_pos[0]:.4f}, {target_pos[1]:.4f}), "
-                        f"actual=({final_pos[0]:.4f}, {final_pos[1]:.4f}), "
-                        f"error=({dx*100:.1f}cm, {dy*100:.1f}cm)"
-                    )
-                    
-                    if dx > 0.005 or dy > 0.005:  # 0.5cm tolerance
-                        gs.logger.warning(
-                            f"Position error exceeds tolerance! May need repositioning."
-                        )
-                        # Return False to trigger replan
-                        return False
-            else:
-                gs.logger.info("Letting physics settle...")
-                for _ in range(150):
-                    self.scene.step()
+                # For Goal 4A with spacing=0.045m (4.5cm), tolerance must be 0.005m (5mm)
+                # This is VERY tight but necessary for blocks almost touching
+                TIGHT_TOLERANCE = 0.005  # 5mm for Goal 4A
+                LOOSE_TOLERANCE = 0.03   # 30mm for normal goals
+                
+                # Use tight tolerance if spacing is small
+                # Heuristic: if blocks are close together, target positions will be close
+                # For now, always use tight tolerance
+                tolerance = TIGHT_TOLERANCE
+                
+                gs.logger.info(f"Final position: ({final_pos[0]:.4f}, {final_pos[1]:.4f}, {final_pos[2]:.4f})")
+                gs.logger.info(f"Position error: dx={dx*1000:.2f}mm, dy={dy*1000:.2f}mm, dz={dz*1000:.2f}mm")
+                gs.logger.info(f"Tolerance: {tolerance*1000:.1f}mm")
+                
+                if dx > tolerance or dy > tolerance:
+                    gs.logger.error(f"❌ POSITION ERROR EXCEEDS TOLERANCE!")
+                    gs.logger.error(f"   Target:  ({target_pos[0]:.4f}, {target_pos[1]:.4f})")
+                    gs.logger.error(f"   Actual:  ({final_pos[0]:.4f}, {final_pos[1]:.4f})")
+                    gs.logger.error(f"   Error:   ({dx*1000:.2f}mm, {dy*1000:.2f}mm)")
+                    gs.logger.error(f"   Limit:   {tolerance*1000:.1f}mm")
+                    gs.logger.info("="*60)
+                    # Return False to trigger replan
+                    return False
+                else:
+                    gs.logger.info(f"✓ Position within tolerance ({tolerance*1000:.1f}mm)")
+                    gs.logger.info("="*60)
             
             gs.logger.info("Put-down completed successfully")
             return True
