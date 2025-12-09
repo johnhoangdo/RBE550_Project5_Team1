@@ -511,7 +511,7 @@ class PlannerInterface:
             traceback.print_exc()
             return False
 
-    def put_down(self, target_pos, pre_place_height=0.20, place_offset=0.08):
+    def put_down(self, target_pos, pre_place_height=0.20, place_offset=0.05):
         """
         Place the currently held object at target position
         
