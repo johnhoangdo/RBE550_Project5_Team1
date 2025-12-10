@@ -125,122 +125,93 @@ def create_scene_12_yellow_blocks() -> Tuple[Any, Any, Dict[str, Any]]:
 # ---------- end helper ----------
 
 # ---------- add new scene factory ----------
-def create_scene_10blocks(settle_steps: int = 200, allow_random_yaw: bool = False) -> Tuple[Any, Any, Dict[str, Any]]:
+def create_scene_10blocks() -> Tuple[Any, Any, Dict[str, Any]]:
     """
-    Create a demo scene with 10 uniquely-colored blocks.
-    Ensures blocks spawn upright on the table and are simulated for `settle_steps`.
-    If allow_random_yaw=True some blocks may be spawned with 45deg yaw (for stability testing).
+    Create a 10-block demo scene (patterned after create_scene_6blocks).
+    Blocks are placed upright on the table (no explicit quaternion) with
+    small random XY noise. Returns scene, franka_adapter, blocks_state.
     """
     scene = _build_base_scene()
-
+    # Add ground plane
     plane = scene.add_entity(gs.morphs.Plane())
 
-    # block half-height (meters)
-    half_h = 0.02  # for box size (0.04,0.04,0.04)
-    safe_z = half_h + 0.002  # slightly above table to avoid initial interpenetration
+    # Position blocks with slight randomization (up to 5cm noise in x/y)
+    posR = _rand_xy((0.85, -0.12, 0.02))
+    posG = _rand_xy((0.85,  0.12, 0.02))
+    posB = _rand_xy((0.65, -0.12, 0.02))
+    posY = _rand_xy((0.65,  0.12, 0.02))
+    posM = _rand_xy((0.45, -0.12, 0.02))
+    posC = _rand_xy((0.45,  0.12, 0.02))
+    # four extra blocks to reach 10
+    posO = _rand_xy((0.25, -0.06, 0.02))
+    posP = _rand_xy((0.25,  0.18, 0.02))
+    posQ = _rand_xy((0.35, -0.26, 0.02))
+    posS = _rand_xy((0.35,  0.26, 0.02))
 
-    pos = {
-        "r": _rand_xy((0.85, -0.12, safe_z)),
-        "g": _rand_xy((0.85,  0.12, safe_z)),
-        "b": _rand_xy((0.65, -0.12, safe_z)),
-        "y": _rand_xy((0.65,  0.12, safe_z)),
-        "m": _rand_xy((0.45, -0.12, safe_z)),
-        "c": _rand_xy((0.45,  0.12, safe_z)),
-        "o": _rand_xy((0.25, -0.06, safe_z)),
-        "p": _rand_xy((0.25,  0.18, safe_z)),
-        "q": _rand_xy((0.35, -0.26, safe_z)),
-        "s": _rand_xy((0.35,  0.26, safe_z)),
-    }
+    # Create colored blocks (no explicit quat/orientation)
+    cubeR = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posR),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.0, 0.0)),
+    )
+    cubeG = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posG),
+        surface=gs.options.surfaces.Plastic(color=(0.0, 1.0, 0.0)),
+    )
+    cubeB = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posB),
+        surface=gs.options.surfaces.Plastic(color=(0.0, 0.0, 1.0)),
+    )
+    cubeY = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posY),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 1.0, 0.0)),
+    )
+    cubeM = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posM),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.0, 1.0)),
+    )
+    cubeC = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posC),
+        surface=gs.options.surfaces.Plastic(color=(0.0, 1.0, 1.0)),
+    )
 
-    COLORS = {
-        "r": (1.0, 0.0, 0.0),
-        "g": (0.0, 1.0, 0.0),
-        "b": (0.0, 0.0, 1.0),
-        "y": (1.0, 1.0, 0.0),
-        "m": (1.0, 0.0, 1.0),
-        "c": (0.0, 1.0, 1.0),
-        "o": (1.0, 0.5, 0.0),
-        "p": (0.0, 0.6, 0.6),
-        "q": (0.6, 0.2, 0.6),
-        "s": (1.0, 0.7, 0.8),
-    }
+    cubeO = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posO),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.5, 0.0)),
+    )
+    cubeP = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posP),
+        surface=gs.options.surfaces.Plastic(color=(0.0, 0.6, 0.6)),
+    )
+    cubeQ = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posQ),
+        surface=gs.options.surfaces.Plastic(color=(0.6, 0.2, 0.6)),
+    )
+    cubeS = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posS),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.7, 0.8)),
+    )
 
-    # identity quaternion = no rotation (x,y,z,w)
-    quat_identity = (0.0, 0.0, 0.0, 1.0)
-    quat_45 = yaw_to_quat(45.0)
-
-    def add_box(name, use_yaw45=False):
-        quat = quat_45 if (allow_random_yaw and use_yaw45) else quat_identity
-        # ensure z is exactly half height (safe_z used above)
-        px, py, pz = pos[name]
-        # use safe_z (small lift) to avoid interpenetration; physics settle will drop it
-        entity = scene.add_entity(
-            gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=(px, py, safe_z), quat=quat),
-            surface=gs.options.surfaces.Plastic(color=COLORS[name]),
-        )
-        # If Genesis version doesn't set quat on construction, try setting afterward:
-        try:
-            entity.set_quat(quat)
-        except Exception:
-            pass
-        return entity
-
-    # decide which blocks, if any, get 45deg at spawn (only when allow_random_yaw True)
-    yaw_map = {}
-    if allow_random_yaw:
-        # e.g., alternate yaw for every other block (or random.choice)
-        for i, name in enumerate(["r","g","b","y","m","c","o","p","q","s"]):
-            yaw_map[name] = (i % 2 == 0)  # even-indexed get 45 deg
-    else:
-        for name in ["r","g","b","y","m","c","o","p","q","s"]:
-            yaw_map[name] = False
-
-    blocks_state = {}
-    for name in ["r","g","b","y","m","c","o","p","q","s"]:
-        blocks_state[name] = add_box(name, use_yaw45=yaw_map[name])
-
-    # add robot
+    # Add robot
     franka_raw = scene.add_entity(gs.morphs.MJCF(file="xml/franka_emika_panda/panda.xml"))
     franka = RobotAdapter(franka_raw, scene)
 
-    # build and settle
+    # Build the scene (sets up physics and visuals)
     scene.build()
 
-    # put robot in initial pose AFTER building so it doesn't collide while blocks settle
+    # Set initial robot joint positions (7 arm joints + 2 gripper fingers)
     franka.set_qpos(np.array([0.0, -0.5, -0.2, -1.0, 0.0, 1.00, 0.5, 0.02, 0.02]))
+
+    # Lift robot slightly to prevent initial collision weirdness
     _elevate_robot_base(franka)
 
-    # run physics steps to allow blocks to fall/settle onto the plane
-    # If your Genesis API has scene.step() or scene.simulate(), use that. Many versions use scene.step().
-    try:
-        for _ in range(settle_steps):
-            scene.step()
-    except Exception:
-        # fallback: some APIs use scene.simulate(dt, nsteps) or scene.advance()
-        try:
-            scene.simulate(settle_steps)
-        except Exception:
-            # if no explicit stepping, sleep briefly to allow viewer to render
-            time.sleep(0.1)
-
-    # final safety: ensure all blocks have z >= half height (if some are below, lift them slightly)
-    for name, ent in blocks_state.items():
-        try:
-            p = ent.get_pos()
-            if p[2] < half_h - 1e-4:
-                # lift block to half height and let it settle again
-                ent.set_pos((p[0], p[1], half_h + 0.001))
-        except Exception:
-            pass
-
-    # one more short settle
-    try:
-        for _ in range(50):
-            scene.step()
-    except Exception:
-        pass
+    blocks_state: Dict[str, Any] = {
+        "r": cubeR, "g": cubeG, "b": cubeB,
+        "y": cubeY, "m": cubeM, "c": cubeC,
+        "o": cubeO, "p": cubeP, "q": cubeQ, "s": cubeS
+    }
 
     return scene, franka, blocks_state
+
 
 
 def create_scene_3red_3green() -> Tuple[Any, Any, Dict[str, Any]]:
