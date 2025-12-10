@@ -389,14 +389,13 @@ class PlannerInterface:
     # MOTION PRIMITIVES
     # =========================================================================
     
-    def plan_to_position(self, target_pos, gripper_open=True, timeout=3.0):
+    def plan_to_position(self, target_pos, gripper_open=True):
         """
         Plan IK to reach a specific 3D position with gripper pointing down.
         
         Args:
             target_pos: Target [x, y, z] position for end effector
             gripper_open: Whether gripper should be open (True) or closed (False)
-            timeout: IK planning timeout
         
         Returns:
             qpos configuration if successful, None if failed
@@ -405,8 +404,7 @@ class PlannerInterface:
             qpos = self.robot.inverse_kinematics(
                 link=self.robot.get_link("hand"),
                 pos=target_pos,
-                quat=np.array([0, 1, 0, 0]),  # Pointing down
-                timeout=timeout
+                quat=np.array([0, 1, 0, 0])  # Pointing down
             )
             
             if qpos is not None:
@@ -662,8 +660,8 @@ class PlannerInterface:
                 dy = abs(final_pos[1] - target_pos[1])
                 dz = abs(final_pos[2] - target_pos[2])
                 
-                # For Goal 4A with spacing=0.045m (4.5cm), tolerance must be 0.005m (5mm)
-                TIGHT_TOLERANCE = 0.01  # 10mm for Goal 4A
+                # For Goal 4A with spacing=0.045m (4.5cm), tolerance = 0.010m (10mm)
+                TIGHT_TOLERANCE = 0.010  # 10mm for Goal 4A (relaxed from 5mm)
                 tolerance = TIGHT_TOLERANCE
                 
                 gs.logger.info(f"Final position: ({final_pos[0]:.4f}, {final_pos[1]:.4f}, {final_pos[2]:.4f})")
