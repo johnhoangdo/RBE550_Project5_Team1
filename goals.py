@@ -90,7 +90,7 @@ def _get_grid_positions():
     try:
         from abstraction import calculate_grid_positions
         return calculate_grid_positions(
-            center=(0.40, -0.12),  # Moved forward for better reachability (was 0.30)
+            center=(0.45, -0.12),  # Moved forward for better reachability (was 0.30)
             spacing=0.045,  # TIGHT spacing for Goal 4A (blocks almost touching!)
             grid_shape=(3, 4)
         )
