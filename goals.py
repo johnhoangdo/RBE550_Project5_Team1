@@ -18,6 +18,9 @@ since the gripper should obviously be empty when we're done.
 Authors: LA, JHD, JEN
 Date: 12/01/2025
 """
+# Add at top of goals.py
+AVAILABLE_BLOCKS = {"r","g","b","y","m","c","o","p","q","s"}  # allow up to 10 named blocks
+MIN_TALLEST_BLOCKS = 8
 
 # ============================================================
 # GOAL 1: Two Towers (RED-GREEN-BLUE + YELLOW-MAGENTA-CYAN)
