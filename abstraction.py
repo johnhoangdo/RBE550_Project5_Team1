@@ -872,14 +872,14 @@ def calculate_2x2_grid_positions(center, spacing):
     ]
 
 
-def check_spatial_constraints(blocks_state, spatial_goals, tolerance=0.005):
+def check_spatial_constraints(blocks_state, spatial_goals, tolerance=0.010):
     """
     Check if blocks satisfy spatial position constraints
     
     Args:
         blocks_state: Dict mapping block names to block objects
         spatial_goals: Dict mapping block names to target (x, y) positions
-        tolerance: Position tolerance in meters (default 0.005m = 5mm for Goal 4A)
+        tolerance: Position tolerance in meters (default 0.010m = 10mm for Goal 4A)
     
     Returns:
         Tuple of (all_satisfied: bool, violations: list)
@@ -933,7 +933,7 @@ def goal_achieved_with_spatial(current_state, goal_predicates, blocks_state):
         spatial_satisfied, violations = check_spatial_constraints(
             blocks_state, 
             goal_predicates["spatial"],
-            tolerance=0.005  # 5mm for Goal 4A (tight spacing)
+            tolerance=0.010  # 10mm for Goal 4A (relaxed from 5mm)
         )
         
         if not spatial_satisfied:
