@@ -67,8 +67,20 @@ GOAL_SIX_TOWER = {
     "clear": ["c"],     # cyan is top
 }
 
-
-
+GOAL_NINE_TOWER = {
+    "on": [
+        ("r", "g"),
+        ("b", "r"),
+        ("y", "b"),
+        ("m", "y"),
+        ("c", "m"),
+        ("o", "c"),
+        ("p", "o"),
+        ("q", "p"),     # q is top
+    ],
+    "ontable": ["g"],
+    "clear": ["q"],
+}
 # ============================================================
 # GOAL 4A-SIMPLE: Two Tower Grid (4 Yellow Blocks) - TEST
 # ============================================================
