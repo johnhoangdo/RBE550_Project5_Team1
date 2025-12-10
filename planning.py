@@ -685,10 +685,14 @@ class PlannerInterface:
                     gs.logger.info(f"Re-centering gripper above block at ({current_block_pos[0]:.4f}, {current_block_pos[1]:.4f})")
                     
                     # Calculate IK for position directly above block's current location
+                    # Use same gripper height as original placement: center + half_block + offset
+                    BLOCK_HEIGHT = 0.04
+                    regrasp_height = current_block_pos[2] + BLOCK_HEIGHT/2 + place_offset
+                    
                     regrasp_target = np.array([
                         current_block_pos[0],
                         current_block_pos[1], 
-                        current_block_pos[2] + 0.02  # 2cm above block center
+                        regrasp_height  # Same height as original placement
                     ])
                     
                     # Plan path to re-center above block
