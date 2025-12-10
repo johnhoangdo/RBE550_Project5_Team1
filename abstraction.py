@@ -20,9 +20,10 @@ import os
 
 # Block dimensions 
 BLOCK_SIZE = 0.04  # 0.04m cubic block
+XY_ALIGNMENT_THRESHOLD = 0.012   # slightly relaxed for 45deg placements
+
 
 # Two blocks are considered aligned if their x,y centers are within this horizontal distance
-XY_ALIGNMENT_THRESHOLD = 0.010
 
 # Vertical separation bounds for ON predicate
 # A block is "on" another if z-distance is within this range
