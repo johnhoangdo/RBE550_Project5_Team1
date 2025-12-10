@@ -304,12 +304,19 @@ def augment_plan_with_positioning(plan, current_state, goal_predicates, blocks_s
     if "holding" in current_state and current_state["holding"]:
         held_block_name = current_state["holding"][0]
     
-    # Step 1: Find ALL base blocks that will be stacked on
+    # Step 1: Find ALL blocks that need spatial positioning
+    # Include: (a) Blocks that will be stacked on, (b) ALL spatial targets
     for action in plan:
         if action[0] == "stack" and len(action) >= 3:
             bottom_block = action[2]
             if bottom_block in spatial_targets:
                 blocks_to_position.add(bottom_block)
+    
+    # CRITICAL FIX for Goal 4B: Add ALL spatial targets, even if nothing stacks on them
+    # This ensures r3, g3 get positioned even though they have no "on" predicates
+    for block_name in spatial_targets.keys():
+        if block_name in blocks_state:
+            blocks_to_position.add(block_name)
     
     # Step 2: If holding a block that needs positioning, put it down FIRST!
     if held_block_name and held_block_name in spatial_targets:
