@@ -633,10 +633,19 @@ class PlannerInterface:
                 self.robot.control_dofs_position(waypoint)
                 self.scene.step()
             
-            # 3. Open gripper
+            # CRITICAL: Wait for motion to fully stop before releasing!
+            gs.logger.info("Holding position (motion stabilization)...")
+            for _ in range(100):  # Hold steady for 100 steps
+                self.robot.control_dofs_position(qpos_place)
+                qpos_place[-2:] = 0.005  # Keep closed!
+                self.scene.step()
+            
+            # 3. Open gripper SLOWLY (now that motion has stopped)
             gs.logger.info("Opening gripper...")
-            qpos_place[-2:] = 0.04  # Open position
-            for _ in range(50):
+            for step in range(100):  # Slow opening over 100 steps
+                alpha = step / 100
+                grip_width = 0.005 + alpha * (0.04 - 0.005)  # 0.005 → 0.04
+                qpos_place[-2:] = grip_width
                 self.robot.control_dofs_position(qpos_place)
                 self.scene.step()
             
