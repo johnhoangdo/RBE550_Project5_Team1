@@ -127,26 +127,35 @@ def create_scene_12_yellow_blocks() -> Tuple[Any, Any, Dict[str, Any]]:
 # ---------- add new scene factory ----------
 def create_scene_10blocks() -> Tuple[Any, Any, Dict[str, Any]]:
     """
-    Create a 10-block demo scene (patterned after create_scene_6blocks).
-    Blocks are placed upright on the table (no explicit quaternion) with
-    small random XY noise. Returns scene, franka_adapter, blocks_state.
+    Create a 10-block demo scene with blocks closer together for tall tower building.
+    Blocks are spread in a compact workspace but not too far apart.
+    Returns scene, franka_adapter, blocks_state.
     """
     scene = _build_base_scene()
     # Add ground plane
     plane = scene.add_entity(gs.morphs.Plane())
 
-    # Position blocks with slight randomization (up to 5cm noise in x/y)
-    posR = _rand_xy((0.85, -0.12, 0.02))
-    posG = _rand_xy((0.85,  0.12, 0.02))
-    posB = _rand_xy((0.65, -0.12, 0.02))
-    posY = _rand_xy((0.65,  0.12, 0.02))
-    posM = _rand_xy((0.45, -0.12, 0.02))
-    posC = _rand_xy((0.45,  0.12, 0.02))
-    # four extra blocks to reach 10
-    posO = _rand_xy((0.25, -0.06, 0.02))
-    posP = _rand_xy((0.25,  0.18, 0.02))
-    posQ = _rand_xy((0.35, -0.26, 0.02))
-    posS = _rand_xy((0.35,  0.26, 0.02))
+    # MORE SPREAD OUT LAYOUT - Blocks further apart but still reachable
+    # Workspace: x=[0.30-0.70], y=[-0.25, +0.25]
+    # Each block has more space around it to avoid collisions
+    
+    # Row 1 (back row, x=0.70)
+    posR = _rand_xy((0.70, -0.15, 0.02), noise=0.02)
+    posG = _rand_xy((0.70,  0.00, 0.02), noise=0.02)
+    posB = _rand_xy((0.70,  0.15, 0.02), noise=0.02)
+    
+    # Row 2 (middle-back, x=0.60)
+    posY = _rand_xy((0.60, -0.25, 0.02), noise=0.02)
+    posM = _rand_xy((0.60,  0.00, 0.02), noise=0.02)
+    posC = _rand_xy((0.60,  0.25, 0.02), noise=0.02)
+    
+    # Row 3 (middle-front, x=0.50)
+    posO = _rand_xy((0.50, -0.15, 0.02), noise=0.02)
+    posP = _rand_xy((0.50,  0.15, 0.02), noise=0.02)
+    
+    # Row 4 (front row, x=0.40)
+    posQ = _rand_xy((0.40, -0.08, 0.02), noise=0.02)
+    posS = _rand_xy((0.40,  0.08, 0.02), noise=0.02)
 
     # Create colored blocks (no explicit quat/orientation)
     cubeR = scene.add_entity(
@@ -173,22 +182,21 @@ def create_scene_10blocks() -> Tuple[Any, Any, Dict[str, Any]]:
         gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posC),
         surface=gs.options.surfaces.Plastic(color=(0.0, 1.0, 1.0)),
     )
-
     cubeO = scene.add_entity(
         gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posO),
-        surface=gs.options.surfaces.Plastic(color=(1.0, 0.5, 0.0)),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.5, 0.0)),  # Orange
     )
     cubeP = scene.add_entity(
         gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posP),
-        surface=gs.options.surfaces.Plastic(color=(0.0, 0.6, 0.6)),
+        surface=gs.options.surfaces.Plastic(color=(0.0, 0.6, 0.6)),  # Teal
     )
     cubeQ = scene.add_entity(
         gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posQ),
-        surface=gs.options.surfaces.Plastic(color=(0.6, 0.2, 0.6)),
+        surface=gs.options.surfaces.Plastic(color=(0.6, 0.2, 0.6)),  # Purple
     )
     cubeS = scene.add_entity(
         gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posS),
-        surface=gs.options.surfaces.Plastic(color=(1.0, 0.7, 0.8)),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.7, 0.8)),  # Pink
     )
 
     # Add robot
@@ -209,6 +217,11 @@ def create_scene_10blocks() -> Tuple[Any, Any, Dict[str, Any]]:
         "y": cubeY, "m": cubeM, "c": cubeC,
         "o": cubeO, "p": cubeP, "q": cubeQ, "s": cubeS
     }
+
+    print("[Scene] Created 10-block scene (spread out layout)")
+    print(f"[Scene] Workspace center: x=0.50m, y=0.0m")
+    print(f"[Scene] Spread: x=[0.40-0.70], y=[-0.25,+0.25]")
+    print(f"[Scene] Min block spacing: ~10-15cm")
 
     return scene, franka, blocks_state
 

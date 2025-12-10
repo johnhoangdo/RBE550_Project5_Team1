@@ -48,16 +48,11 @@ def attempt_tallest_tower(franka, scene, blocks_state, starting_order, extras, m
     and extras (list) to add on top. Tries orientation schedules (0 or 45 deg).
     Returns (best_height, best_goal)
     """
-    import time
-    from abstraction import compute_predicates, generate_pddl_problem  # adapt names if different
-    from task_planner import call_planner, parse_plan_output, create_pddl_problem_file
-    # PlannerInterface is your motion primitive wrapper. If you named it differently, import the correct class.
-    try:
-        from planning import PlannerInterface
-        planner_iface = PlannerInterface(franka, scene)
-    except Exception:
-        planner_iface = None
-        print("[TALLEST] Warning: PlannerInterface not available; attempting to call planning.execute_primitive directly")
+    import abstraction
+    import task_planner
+    from planning import PlannerInterface
+    
+    planner_iface = PlannerInterface(franka, scene)
 
     # build all candidate orders (starting + 0..len(extras) extras)
     candidates = []
@@ -79,37 +74,26 @@ def attempt_tallest_tower(franka, scene, blocks_state, starting_order, extras, m
 
         print(f"[TALLEST] Trying candidate height {len(candidate)}: {candidate}")
 
-        # 1) Get symbolic predicates from abstraction (adapt compute_predicates signature if needed)
+        # 1) Get symbolic predicates from abstraction
         try:
-            preds = abstraction.compute_predicates()
-        except Exception:
-            # if your compute_predicates needs args, call with (franka, blocks_state, scene)
-            try:
-                preds = abstraction.compute_predicates(franka, blocks_state, scene)
-            except Exception as e:
-                print("[TALLEST] Failed to compute predicates:", e)
-                continue
+            preds = abstraction.compute_predicates(franka, blocks_state, scene)
+        except Exception as e:
+            print("[TALLEST] Failed to compute predicates:", e)
+            continue
 
-        # 2) Create a PDDL problem file for this goal (adapt function name if different)
+        # 2) Create a PDDL problem file for this goal
         try:
-            # Some projects call it create_pddl_problem_file; others generate_pddl_problem
-            try:
-                problem_file = task_planner.create_pddl_problem_file(preds, goal)
-            except Exception:
-                problem_file = task_planner.generate_pddl_problem(preds, goal, filename="tallest_problem.pddl")
+            problem_file = abstraction.generate_pddl_problem(preds, goal, "tallest_problem.pddl")
         except Exception as e:
             print("[TALLEST] Failed to generate PDDL problem:", e)
             continue
 
-        # 3) Call symbolic planner
+        # 3) Call symbolic planner (domain_file, problem_file order)
         try:
-            plan_result = task_planner.call_planner(problem_file, domain_file="blocksworld_domain.pddl", timeout=30)
-        except Exception:
-            try:
-                plan_result = task_planner.call_planner(problem_file, timeout=30)
-            except Exception as e:
-                print("[TALLEST] call_planner failed:", e)
-                plan_result = None
+            plan_result = task_planner.call_planner("blocksworld_domain.pddl", problem_file, use_pyperplan=True, timeout=30)
+        except Exception as e:
+            print("[TALLEST] call_planner failed:", e)
+            plan_result = None
 
         if not plan_result:
             print(f"[TALLEST] planner returned no plan for {len(candidate)} blocks")
@@ -136,11 +120,11 @@ def attempt_tallest_tower(franka, scene, blocks_state, starting_order, extras, m
 
         for schedule in schedules:
             print(f"[TALLEST] Trying orientation schedule: {schedule}")
-            # Execute actions using planner_iface where possible, else call planning.execute_primitive()
+            
+            # Execute actions using planner_iface
             all_ok = True
             for act in actions:
                 # Normalize action representation to a tuple or string tokens
-                # Typical string form: "STACK R G" or "pick-up r"
                 if isinstance(act, str):
                     tokens = act.replace("(", " ").replace(")", " ").replace(",", " ").split()
                     tokens = [t.lower() for t in tokens if t.strip()]
@@ -167,48 +151,92 @@ def attempt_tallest_tower(franka, scene, blocks_state, starting_order, extras, m
                     held = args[0]
                     orientation = schedule.get(held, None)
 
-                # Execute using PlannerInterface if available
+                # Execute using PlannerInterface
                 ok = False
                 try:
-                    if planner_iface is not None:
-                        # Try mapping ops to planner_iface methods
-                        if op in ("pick-up", "pickup", "pick"):
-                            ok = planner_iface.pick_up(blocks_state[args[0]])
-                        elif op in ("put-down", "putdown", "put_down", "place"):
-                            # pass orientation hint if method supports it
-                            if hasattr(planner_iface.put_down, "__call__"):
-                                try:
-                                    ok = planner_iface.put_down(orientation_deg=orientation)
-                                except TypeError:
-                                    ok = planner_iface.put_down()
-                            else:
-                                ok = True
-                        elif op in ("stack", "stack-on", "stackon"):
-                            # planner_iface.stack(target_entity, orientation_deg=orientation)
-                            bottom = args[1] if len(args) > 1 else None
-                            target_entity = blocks_state.get(bottom)
-                            if hasattr(planner_iface.stack, "__call__"):
-                                try:
-                                    ok = planner_iface.stack(target_entity, orientation_deg=orientation)
-                                except TypeError:
-                                    ok = planner_iface.stack(target_entity)
-                            else:
-                                ok = True
-                        elif op in ("unstack",):
-                            ok = planner_iface.pick_up(blocks_state[args[0]])
+                    if op in ("pick-up", "pickup", "pick"):
+                        ok = planner_iface.pick_up(blocks_state[args[0]])
+                    elif op in ("put-down", "putdown", "put_down", "place"):
+                        # Get current position for put-down
+                        if planner_iface.attached_object:
+                            pos = planner_iface.attached_object.get_pos()
+                            target_pos = [pos[0], pos[1], 0.02]
+                            ok = planner_iface.put_down(target_pos)
                         else:
-                            # fallback: try calling a generic execute_primitive
-                            ok = planning.execute_primitive(" ".join([op] + args), orientation_deg=orientation)
+                            ok = False
+                    elif op in ("stack", "stack-on", "stackon"):
+                        bottom = args[1] if len(args) > 1 else None
+                        target_entity = blocks_state.get(bottom)
+                        if target_entity:
+                            ok = planner_iface.stack(target_entity)
+                        else:
+                            ok = False
+                    elif op in ("unstack",):
+                        ok = planner_iface.pick_up(blocks_state[args[0]])
                     else:
-                        # No PlannerInterface — call generic execute_primitive
-                        ok = planning.execute_primitive(" ".join([op] + args), orientation_deg=orientation)
+                        print(f"[TALLEST] Unknown operation: {op}")
+                        ok = False
                 except Exception as e:
                     print("[TALLEST] Exception while executing:", e)
                     ok = False
 
+                # Add retry logic (2 additional attempts)
+                if not ok:
+                    for retry_attempt in range(2):
+                        print(f"[TALLEST] Retrying action (attempt {retry_attempt+2}/3)...")
+                        # Wait a bit for physics to settle
+                        for _ in range(50):
+                            scene.step()
+                        
+                        # Retry the same action
+                        try:
+                            if op in ("pick-up", "pickup", "pick"):
+                                ok = planner_iface.pick_up(blocks_state[args[0]])
+                            elif op in ("put-down", "putdown", "put_down", "place"):
+                                if planner_iface.attached_object:
+                                    pos = planner_iface.attached_object.get_pos()
+                                    target_pos = [pos[0], pos[1], 0.02]
+                                    ok = planner_iface.put_down(target_pos)
+                            elif op in ("stack", "stack-on", "stackon"):
+                                bottom = args[1] if len(args) > 1 else None
+                                target_entity = blocks_state.get(bottom)
+                                if target_entity:
+                                    # === BEFORE STACKING - LOG POSITIONS ===
+                                    print(f"\n{'='*70}")
+                                    print(f"[TALLEST] About to stack {args[0]} on {bottom}")
+                                    print(f"[TALLEST] Bottom block '{bottom}' REAL position: {target_entity.get_pos()}")
+                                    if planner_iface.attached_object:
+                                        print(f"[TALLEST] Held block '{args[0]}' position: {planner_iface.attached_object.get_pos()}")
+                                    print(f"{'='*70}\n")
+                                    
+                                    ok = planner_iface.stack(target_entity)
+                                    
+                                    # === AFTER STACKING - VERIFY ===
+                                    if ok:
+                                        print(f"\n{'='*70}")
+                                        print(f"[TALLEST] Stack completed for {args[0]} on {bottom}")
+                                        print(f"[TALLEST] Bottom block '{bottom}' position after: {target_entity.get_pos()}")
+                                        # Find the top block in blocks_state
+                                        top_block = blocks_state.get(args[0])
+                                        if top_block:
+                                            print(f"[TALLEST] Top block '{args[0]}' final position: {top_block.get_pos()}")
+                                            # Check alignment
+                                            bottom_pos = target_entity.get_pos()
+                                            top_pos = top_block.get_pos()
+                                            xy_error = np.linalg.norm(top_pos[:2] - bottom_pos[:2])
+                                            print(f"[TALLEST] XY alignment error: {xy_error*1000:.2f}mm")
+                                        print(f"{'='*70}\n")
+                        except Exception as e:
+                            print(f"[TALLEST] Retry failed: {e}")
+                            ok = False
+                        
+                        if ok:
+                            print(f"[TALLEST] Retry successful!")
+                            break
+                
                 if not ok:
                     all_ok = False
-                    print("[TALLEST] Action failed:", op, args)
+                    print("[TALLEST] Action failed after 3 attempts:", op, args)
                     break
 
             if all_ok:

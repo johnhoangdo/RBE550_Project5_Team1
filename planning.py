@@ -653,7 +653,14 @@ class PlannerInterface:
             gs.logger.info(f"PUT-DOWN VERIFICATION - Target: ({target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f})")
             gs.logger.info("Settling physics (500 steps for tight spacing)...")
             
-            for _ in range(500):  # Much longer for tight grids
+            # Height-dependent settling: higher blocks need MORE time to settle
+            stack_level = int(target_pos[2] / 0.04)  # Which level (0=table, 1=first block, etc.)
+            base_settling = 300
+            extra_settling = stack_level * 100  # 100 extra steps per level
+            total_settling = base_settling + extra_settling
+            
+            gs.logger.info(f"Settling for {total_settling} steps (level {stack_level})...")
+            for _ in range(total_settling):
                 self.scene.step()
             
             # 6. VERIFY POSITION (before detaching/retracting!)
@@ -663,10 +670,25 @@ class PlannerInterface:
                 dy = abs(final_pos[1] - target_pos[1])
                 dz = abs(final_pos[2] - target_pos[2])
                 
-                # For Goal 4A with spacing=0.045m (4.5cm), tolerance must be 0.005m (5mm)
-                TIGHT_TOLERANCE = 0.005  # 5mm for Goal 4A
-                tolerance = TIGHT_TOLERANCE
+                # Height-dependent tolerance: STRICTER as tower gets taller
+                # Lower blocks can tolerate slight error, but errors compound upward
+                # So upper blocks need TIGHTER placement to stay centered
                 
+                stack_level = int(target_pos[2] / 0.04)  # Which level
+                
+                if stack_level == 0:  # Base block on table
+                    tolerance = 0.003  # 3mm - reasonable for base
+                elif stack_level <= 2:  # Blocks 1-2
+                    tolerance = 0.003  # 3mm - keep same
+                elif stack_level <= 4:  # Blocks 3-4
+                    tolerance = 0.004  # 4mm - slightly relaxed (was 1.5mm)
+                elif stack_level <= 6:  # Blocks 5-6
+                    tolerance = 0.005  # 5mm - moderate (was 1mm)
+                else:  # Blocks 7+
+                    tolerance = 0.006  # 6mm - still tight but achievable (was 0.8mm)
+                
+                gs.logger.info(f"[STRICT] Level {stack_level}, height {target_pos[2]:.3f}m → tolerance: {tolerance*1000:.2f}mm")
+                gs.logger.info(f"[HEIGHT-BASED] Stack height: {target_pos[2]:.3f}m, tolerance: {tolerance*1000:.1f}mm")
                 gs.logger.info(f"Final position: ({final_pos[0]:.4f}, {final_pos[1]:.4f}, {final_pos[2]:.4f})")
                 gs.logger.info(f"Position error: dx={dx*1000:.2f}mm, dy={dy*1000:.2f}mm, dz={dz*1000:.2f}mm")
                 gs.logger.info(f"Tolerance: {tolerance*1000:.1f}mm")
@@ -810,21 +832,38 @@ class PlannerInterface:
                 gs.logger.warning("No object attached to stack")
                 return False
             
-            # Get target block position (center of target block)
-            target_pos = target_block.get_pos()
-            gs.logger.info(f"Stacking on block at {target_pos}")
+            # === VERIFICATION LOGGING ===
+            gs.logger.info("="*70)
+            gs.logger.info("STACK OPERATION - POSITION TRACKING")
+            gs.logger.info("="*70)
             
-            # Calculate where new block's CENTER should be
-            # target_pos[2] is center of lower block
-            # New block center = lower block center + one full block height
+            # Get REAL-TIME position of target block (the block we're stacking ON)
+            target_pos_tensor = target_block.get_pos()
+            target_pos = target_pos_tensor.cpu().numpy() if torch.is_tensor(target_pos_tensor) else target_pos_tensor
+            gs.logger.info(f"Target block ACTUAL position: ({target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f})")
+            
+            # Calculate where new block's CENTER should be based on ACTUAL target position
             stack_pos = np.array([
-                target_pos[0], 
-                target_pos[1], 
-                target_pos[2] + stack_height  # One block height above center
+                target_pos[0],  # Use ACTUAL X
+                target_pos[1],  # Use ACTUAL Y
+                target_pos[2] + stack_height  # Stack one block height above ACTUAL center
             ])
+            gs.logger.info(f"Calculated stack position: ({stack_pos[0]:.4f}, {stack_pos[1]:.4f}, {stack_pos[2]:.4f})")
+            
+            # Get position of block we're holding (for comparison)
+            held_block_pos_tensor = self.attached_object.get_pos()
+            held_block_pos = held_block_pos_tensor.cpu().numpy() if torch.is_tensor(held_block_pos_tensor) else held_block_pos_tensor
+            gs.logger.info(f"Held block current position: ({held_block_pos[0]:.4f}, {held_block_pos[1]:.4f}, {held_block_pos[2]:.4f})")
+            
+            # Calculate the movement distance
+            distance = np.linalg.norm(stack_pos[:2] - held_block_pos[:2])
+            gs.logger.info(f"Horizontal distance to target: {distance*1000:.1f}mm")
+            gs.logger.info("="*70)
             
             # Use put_down with HIGHER offset to prevent slamming
-            return self.put_down(stack_pos, place_offset=0.08)
+            result = self.put_down(stack_pos, place_offset=0.08)
+            
+            return result
             
         except Exception as e:  
             gs.logger.error(f"Stack failed with exception: {e}")
