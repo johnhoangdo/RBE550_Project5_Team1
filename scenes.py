@@ -120,6 +120,88 @@ def create_scene_12_yellow_blocks() -> Tuple[Any, Any, Dict[str, Any]]:
         (0.55, -0.3, 0.02), (0.55, -0.1, 0.02), (0.55, 0.1, 0.02), (0.55, 0.3, 0.02),
         (0.40, -0.3, 0.02), (0.40, -0.1, 0.02), (0.40, 0.1, 0.02), (0.40, 0.3, 0.02)
     ]
+
+# ---------- add near the top, after imports ----------
+import math
+
+def yaw_to_quat(yaw_deg: float):
+    """Return (x,y,z,w) quaternion for yaw only (Z axis)."""
+    yaw = math.radians(yaw_deg)
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    # quaternion as (x,y,z,w)
+    return (0.0, 0.0, sy, cy)
+# ---------- end helper ----------
+
+# ---------- add new scene factory ----------
+def create_scene_10blocks() -> Tuple[Any, Any, Dict[str, Any]]:
+    """
+    Create a demo scene with 10 uniquely-colored blocks.
+    Keys used: r,g,b,y,m,c,o,p,q,s
+    Each block may be spawned with yaw 0 or 45 degrees (random).
+    """
+    scene = _build_base_scene()
+
+    plane = scene.add_entity(gs.morphs.Plane())
+
+    # base positions (two rows) and small xy noise
+    pos = {
+        "r": _rand_xy((0.85, -0.12, 0.02)),
+        "g": _rand_xy((0.85,  0.12, 0.02)),
+        "b": _rand_xy((0.65, -0.12, 0.02)),
+        "y": _rand_xy((0.65,  0.12, 0.02)),
+        "m": _rand_xy((0.45, -0.12, 0.02)),
+        "c": _rand_xy((0.45,  0.12, 0.02)),
+        "o": _rand_xy((0.25, -0.06, 0.02)),
+        "p": _rand_xy((0.25,  0.18, 0.02)),
+        "q": _rand_xy((0.35, -0.26, 0.02)),
+        "s": _rand_xy((0.35,  0.26, 0.02)),
+    }
+
+    COLORS = {
+        "r": (1.0, 0.0, 0.0),   # red
+        "g": (0.0, 1.0, 0.0),   # green
+        "b": (0.0, 0.0, 1.0),   # blue
+        "y": (1.0, 1.0, 0.0),   # yellow
+        "m": (1.0, 0.0, 1.0),   # magenta
+        "c": (0.0, 1.0, 1.0),   # cyan
+        "o": (1.0, 0.5, 0.0),   # orange
+        "p": (0.0, 0.6, 0.6),   # teal
+        "q": (0.6, 0.2, 0.6),   # purple
+        "s": (1.0, 0.7, 0.8),   # peach
+    }
+
+    yaw_choices = [0.0, 45.0]
+
+    def add_box(name):
+        yaw = random.choice(yaw_choices)
+        quat = yaw_to_quat(yaw)
+        # Genesis accepts quat=(x,y,z,w) for orientation; if your API uses 'rot' change accordingly
+        cube = scene.add_entity(
+            gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=pos[name], quat=quat),
+            surface=gs.options.surfaces.Plastic(color=COLORS[name]),
+        )
+        # Optional: set a readable name attribute if useful for robot/abstraction
+        try:
+            cube.name = name
+        except Exception:
+            pass
+        return cube
+
+    # Create cubes and map names -> entity
+    blocks_state = { name: add_box(name) for name in ["r","g","b","y","m","c","o","p","q","s"] }
+
+    # add robot
+    franka_raw = scene.add_entity(gs.morphs.MJCF(file="xml/franka_emika_panda/panda.xml"))
+    franka = RobotAdapter(franka_raw, scene)
+
+    scene.build()
+    franka.set_qpos(np.array([0.0, -0.5, -0.2, -1.0, 0.0, 1.00, 0.5, 0.02, 0.02]))
+    _elevate_robot_base(franka)
+
+    return scene, franka, blocks_state
+# ---------- end factory ----------
+
     
     for i, pos in enumerate(positions):
         pos_noisy = _rand_xy(pos, noise=0.03)
