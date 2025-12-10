@@ -388,6 +388,36 @@ class PlannerInterface:
     # =========================================================================
     # MOTION PRIMITIVES
     # =========================================================================
+    
+    def plan_to_position(self, target_pos, gripper_open=True, timeout=3.0):
+        """
+        Plan IK to reach a specific 3D position with gripper pointing down.
+        
+        Args:
+            target_pos: Target [x, y, z] position for end effector
+            gripper_open: Whether gripper should be open (True) or closed (False)
+            timeout: IK planning timeout
+        
+        Returns:
+            qpos configuration if successful, None if failed
+        """
+        try:
+            qpos = self.robot.inverse_kinematics(
+                link=self.robot.get_link("hand"),
+                pos=target_pos,
+                quat=np.array([0, 1, 0, 0]),  # Pointing down
+                timeout=timeout
+            )
+            
+            if qpos is not None:
+                # Set gripper state
+                qpos[-2:] = 0.04 if gripper_open else 0.005
+            
+            return qpos
+            
+        except Exception as e:
+            gs.logger.warning(f"IK failed for position {target_pos}: {e}")
+            return None
 
     def pick_up(self, block, pre_grasp_height=0.25, grasp_offset=0.09):
         """
@@ -651,10 +681,45 @@ class PlannerInterface:
                     # IMMEDIATE REPOSITIONING - Don't retract, pick up and try again!
                     gs.logger.warning("Attempting immediate repositioning...")
                     
-                    # Close gripper to re-grasp (still above block)
-                    qpos_place[-2:] = 0.005
+                    # CRITICAL FIX: Re-center gripper above block's CURRENT position!
+                    # Block may have shifted, so can't use old qpos_place
+                    current_block_pos = placed_block.get_pos()
+                    gs.logger.info(f"Re-centering gripper above block at ({current_block_pos[0]:.4f}, {current_block_pos[1]:.4f})")
+                    
+                    # Calculate IK for position directly above block's current location
+                    regrasp_target = np.array([
+                        current_block_pos[0],
+                        current_block_pos[1], 
+                        current_block_pos[2] + 0.02  # 2cm above block center
+                    ])
+                    
+                    # Plan path to re-center above block
+                    qpos_recenter = self.plan_to_position(regrasp_target, gripper_open=True)
+                    if qpos_recenter is None:
+                        gs.logger.error("Failed to plan re-centering motion!")
+                        # Still try with old position as fallback
+                        qpos_recenter = qpos_place
+                    else:
+                        # Move to re-centered position
+                        gs.logger.info("Moving to re-centered position...")
+                        for i in range(50):
+                            alpha = i / 50
+                            waypoint = (1-alpha) * qpos_place + alpha * qpos_recenter
+                            waypoint[-2:] = 0.04  # Keep open
+                            self.robot.control_dofs_position(waypoint)
+                            self.scene.step()
+                        qpos_place = qpos_recenter  # Update placement position
+                    
+                    # Now close gripper to re-grasp (centered above block)
+                    gs.logger.info("Closing gripper to re-grasp...")
+                    if hasattr(qpos_place, 'clone'):
+                        qpos_grasp = qpos_place.clone()
+                    else:
+                        qpos_grasp = qpos_place.copy()
+                    qpos_grasp[-2:] = 0.005
+                    
                     for _ in range(50):
-                        self.robot.control_dofs_position(qpos_place)
+                        self.robot.control_dofs_position(qpos_grasp)
                         self.scene.step()
                     
                     # Re-attach for repositioning
