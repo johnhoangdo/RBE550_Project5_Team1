@@ -2,6 +2,7 @@ import genesis as gs
 import numpy as np
 import torch
 from typing import Any
+import math
 
 from genesis.utils.misc import tensor_to_array
 from robot_adapter import RobotAdapter
@@ -104,6 +105,36 @@ class PlanningConfig:
 
 # Global configuration instance (defaults to Goal 3)
 planning_config = PlanningConfig(mode='goal3')
+
+
+
+def yaw_to_quat_local(yaw_deg: float):
+    yaw = math.radians(yaw_deg)
+    return (0.0, 0.0, math.sin(yaw*0.5), math.cos(yaw*0.5))
+
+def quat_mul(q1, q2):
+    # q = (x,y,z,w)
+    x1,y1,z1,w1 = q1; x2,y2,z2,w2 = q2
+    x = w1*x2 + x1*w2 + y1*z2 - z1*y2
+    y = w1*y2 - x1*z2 + y1*w2 + z1*x2
+    z = w1*z2 + x1*y2 - y1*x2 + z1*w2
+    w = w1*w2 - x1*x2 - y1*y2 - z1*z2
+    return (x,y,z,w)
+
+# In PlannerInterface or wherever you compute place/grasp pose:
+def _apply_orientation_hint_to_pose(pose, orientation_deg):
+    """
+    pose: dict or tuple with 'quat' or (x,y,z,qx,qy,qz,qw)
+    Returns pose with quat rotated by yaw hint.
+    """
+    if orientation_deg is None:
+        return pose
+    yaw_q = yaw_to_quat_local(orientation_deg)
+    # extract original quat (assume pose['quat'] in (x,y,z,w))
+    orig_q = pose['quat']
+    new_q = quat_mul(yaw_q, orig_q)
+    pose['quat'] = new_q
+    return pose
 
 
 def set_planning_mode(mode='goal3'):
