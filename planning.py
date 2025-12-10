@@ -710,14 +710,85 @@ class PlannerInterface:
                         # Still try with old position as fallback
                         qpos_recenter = qpos_place
                     else:
-                        # Move to re-centered position
-                        gs.logger.info("Moving to re-centered position...")
+                        # CRITICAL: Move safely by lifting, shifting, lowering (not direct path!)
+                        gs.logger.info("Safe re-centering motion (lift → shift → lower)...")
+                        
+                        # Step 1: Lift straight up FIRST to clear any obstacles
+                        gs.logger.info("  Step 1/3: Lifting to safe height...")
+                        if hasattr(qpos_preplace, 'clone'):
+                            qpos_safe_height = qpos_preplace.clone()
+                        else:
+                            qpos_safe_height = qpos_preplace.copy()
+                        qpos_safe_height[-2:] = 0.04  # Keep open during lift
+                        
                         for i in range(50):
                             alpha = i / 50
-                            waypoint = (1-alpha) * qpos_place + alpha * qpos_recenter
+                            waypoint = (1-alpha) * qpos_place + alpha * qpos_safe_height
                             waypoint[-2:] = 0.04  # Keep open
                             self.robot.control_dofs_position(waypoint)
                             self.scene.step()
+                        
+                        # Step 2: Plan path to new XY position at safe height
+                        gs.logger.info("  Step 2/3: Moving to new XY position at safe height...")
+                        # Calculate position at safe height above new target
+                        current_block_pos = placed_block.get_pos()
+                        BLOCK_HEIGHT = 0.04
+                        safe_height_above_new = current_block_pos[2] + BLOCK_HEIGHT/2 + place_offset + pre_place_height
+                        
+                        new_xy_safe_pos = np.array([
+                            current_block_pos[0],
+                            current_block_pos[1],
+                            safe_height_above_new
+                        ])
+                        
+                        qpos_new_xy_safe = self.robot.inverse_kinematics(
+                            link=self.robot.get_link("hand"),
+                            pos=new_xy_safe_pos,
+                            quat=np.array([0, 1, 0, 0])
+                        )
+                        
+                        if qpos_new_xy_safe is not None:
+                            qpos_new_xy_safe[-2:] = 0.04
+                            # Use motion planning for horizontal move
+                            path_horizontal = self.plan_path(
+                                qpos_goal=qpos_new_xy_safe,
+                                timeout=3.0,
+                                num_waypoints=100
+                            )
+                            
+                            if path_horizontal:
+                                for waypoint in path_horizontal:
+                                    waypoint[-2:] = 0.04  # Keep open
+                                    self.robot.control_dofs_position(waypoint)
+                                    self.scene.step()
+                            else:
+                                # Fallback: direct interpolation if planning fails
+                                for i in range(50):
+                                    alpha = i / 50
+                                    waypoint = (1-alpha) * qpos_safe_height + alpha * qpos_new_xy_safe
+                                    waypoint[-2:] = 0.04
+                                    self.robot.control_dofs_position(waypoint)
+                                    self.scene.step()
+                        
+                        # Step 3: Lower straight down to re-grasp position
+                        gs.logger.info("  Step 3/3: Lowering to re-grasp position...")
+                        # Re-calculate qpos_recenter at lower height
+                        qpos_recenter = self.plan_to_position(regrasp_target, gripper_open=True)
+                        if qpos_recenter is None:
+                            qpos_recenter = qpos_place  # Fallback
+                        
+                        qpos_recenter[-2:] = 0.04
+                        
+                        # Get current position (should be at safe height)
+                        current_qpos = self.robot.get_dofs_position()
+                        
+                        for i in range(50):
+                            alpha = i / 50
+                            waypoint = (1-alpha) * current_qpos + alpha * qpos_recenter
+                            waypoint[-2:] = 0.04  # Keep open
+                            self.robot.control_dofs_position(waypoint)
+                            self.scene.step()
+                        
                         qpos_place = qpos_recenter  # Update placement position
                     
                     # Now close gripper to re-grasp (centered above block)
