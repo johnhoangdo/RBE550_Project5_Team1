@@ -417,7 +417,7 @@ class PlannerInterface:
             gs.logger.warning(f"IK failed for position {target_pos}: {e}")
             return None
 
-    def pick_up(self, block, pre_grasp_height=0.25, grasp_offset=0.10):
+    def pick_up(self, block, pre_grasp_height=0.25, grasp_offset=0.11):
         """
         Pick up a block from the table or from on top of another block
         
@@ -941,7 +941,7 @@ class PlannerInterface:
             ])
             
             # Use put_down with HIGHER offset to prevent slamming
-            return self.put_down(stack_pos, place_offset=0.08)
+            return self.put_down(stack_pos, place_offset=0.12)
             
         except Exception as e:  
             gs.logger.error(f"Stack failed with exception: {e}")
