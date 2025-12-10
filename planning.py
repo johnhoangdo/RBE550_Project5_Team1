@@ -417,7 +417,7 @@ class PlannerInterface:
             gs.logger.warning(f"IK failed for position {target_pos}: {e}")
             return None
 
-    def pick_up(self, block, pre_grasp_height=0.25, grasp_offset=0.11):
+    def pick_up(self, block, pre_grasp_height=0.25, grasp_offset=0.10):
         """
         Pick up a block from the table or from on top of another block
         
