@@ -539,7 +539,7 @@ class PlannerInterface:
             traceback.print_exc()
             return False
 
-    def put_down(self, target_pos, pre_place_height=0.20, place_offset=0.08):
+    def put_down(self, target_pos, pre_place_height=0.30, place_offset=0.08):
         """
         Place the currently held object at target position
         
@@ -654,12 +654,11 @@ class PlannerInterface:
             placed_block = self.attached_object
             
             # 5. Let physics settle FIRST (CRITICAL - before retraction!)
-            # For Goal 4A: spacing=0.045m, tolerance must be very tight (0.005m = 5mm)
             gs.logger.info("="*60)
             gs.logger.info(f"PUT-DOWN VERIFICATION - Target: ({target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f})")
-            gs.logger.info("Settling physics (500 steps for tight spacing)...")
+            gs.logger.info("Settling physics (200 steps for tight spacing)...")
             
-            for _ in range(500):  # Much longer for tight grids
+            for _ in range(200):  # Reduced from 500 for faster execution
                 self.scene.step()
             
             # 6. VERIFY POSITION (before detaching/retracting!)
