@@ -91,7 +91,7 @@ def _get_grid_positions():
         from abstraction import calculate_grid_positions
         return calculate_grid_positions(
             center=(0.30, 0.0),  # Moved back to clear spawn area
-            spacing=0.045,  # TIGHT spacing for Goal 4A (blocks almost touching!)
+            spacing=0.05,  # TIGHT spacing for Goal 4A (blocks almost touching!)
             grid_shape=(3, 4)
         )
     except ImportError:
