@@ -555,6 +555,23 @@ def main():
         goal_name_str = "six_tower"
         goal_description = "Goal 3: Single 6-Block Tall Tower"
         use_spatial = False
+    elif use_goal3_extended:
+        print("\n[MODE] Goal 3 Extended (Tallest Tower attempt — 8+ blocks)")
+        # Create the 10-block demo scene (factory must be in scenes.py)
+        scene, franka, blocks_state = create_scene_10blocks()
+
+        # define a sensible starting tower (bottom -> top) and extras pool
+        starting = ["r", "g", "b", "y", "m"]   # example base 5-block stack
+        extras = ["c", "o", "p", "q", "s"]     # extras to reach up to 10 blocks
+
+        # run the tallest-tower routine (enforces min 8 by default)
+        best_h, best_goal = attempt_tallest_tower(franka, scene, blocks_state, starting, extras, min_blocks=8)
+        print("[MODE] Tallest tower attempt finished. Best height:", best_h)
+        print("[MODE] Best goal:", best_goal)
+
+        # exit after attempt (or remove sys.exit(...) to continue into interactive tamp loop)
+        sys.exit(0 if best_h >= 8 else 1)
+
     elif use_goal4a:
         scene, franka, blocks_state = create_scene_12_yellow_blocks()
         goal_name_str = "tower_grid"
