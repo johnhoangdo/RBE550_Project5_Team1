@@ -148,7 +148,7 @@ def _get_2x2_positions():
     try:
         from abstraction import calculate_2x2_grid_positions
         return calculate_2x2_grid_positions(
-            center=(0.35, 0.0),  # Move back to clear spawn area
+            center=(0.40, 0.0),  # Move back to clear spawn area
             spacing=0.045  # Reduced from 0.15 to 0.10 (closer together)
         )
     except ImportError:
