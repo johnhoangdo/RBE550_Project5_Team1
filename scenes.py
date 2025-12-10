@@ -122,15 +122,6 @@ def create_scene_12_yellow_blocks() -> Tuple[Any, Any, Dict[str, Any]]:
     ]
 
 # ---------- add near the top, after imports ----------
-import math
-
-def yaw_to_quat(yaw_deg: float):
-    """Return (x,y,z,w) quaternion for yaw only (Z axis)."""
-    yaw = math.radians(yaw_deg)
-    cy = math.cos(yaw * 0.5)
-    sy = math.sin(yaw * 0.5)
-    # quaternion as (x,y,z,w)
-    return (0.0, 0.0, sy, cy)
 # ---------- end helper ----------
 
 # ---------- add new scene factory ----------
