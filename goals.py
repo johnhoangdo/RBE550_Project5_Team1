@@ -90,15 +90,15 @@ def _get_grid_positions():
     try:
         from abstraction import calculate_grid_positions
         return calculate_grid_positions(
-            center=(0.30, 0.0),  # Moved back to clear spawn area
-            spacing=0.05,  # TIGHT spacing for Goal 4A (blocks almost touching!)
+            center=(0.35, 0.0),  # Moved forward for better reachability (was 0.30)
+            spacing=0.045,  # TIGHT spacing for Goal 4A (blocks almost touching!)
             grid_shape=(3, 4)
         )
     except ImportError:
-        # Fallback if abstraction not available - also with tight spacing
-        return [(0.2775, -0.0675), (0.2775, -0.0225), (0.2775, 0.0225), (0.2775, 0.0675),
-                (0.3225, -0.0675), (0.3225, -0.0225), (0.3225, 0.0225), (0.3225, 0.0675),
-                (0.3675, -0.0675), (0.3675, -0.0225), (0.3675, 0.0225), (0.3675, 0.0675)]
+        # Fallback if abstraction not available - also shifted +0.05 in X
+        return [(0.3275, -0.0675), (0.3275, -0.0225), (0.3275, 0.0225), (0.3275, 0.0675),
+                (0.3725, -0.0675), (0.3725, -0.0225), (0.3725, 0.0225), (0.3725, 0.0675),
+                (0.4175, -0.0675), (0.4175, -0.0225), (0.4175, 0.0225), (0.4175, 0.0675)]
 
 # Pattern: X T T X / T X X T / X T T X
 # Where X = empty, T = 2-block tower
