@@ -112,12 +112,22 @@ def reposition_knocked_blocks(planner, scene, blocks_state, spatial_targets, tol
     
     repositioned_count = 0
     
-    for block_name, current_pos, target_pos, error in misplaced_blocks:
+    for block_name, old_pos, target_pos, error in misplaced_blocks:
         print(f"\n[RECOVERY] Repositioning {block_name}...")
         
         block = blocks_state[block_name]
         
-        # Pick up the misplaced block
+        # CRITICAL: Get FRESH position before picking up
+        # Block may have moved since last check (physics settling, collisions, etc.)
+        current_pos = block.get_pos()
+        
+        # If block moved significantly since detection, update user
+        pos_change = ((current_pos[0] - old_pos[0])**2 + (current_pos[1] - old_pos[1])**2)**0.5
+        if pos_change > 0.01:  # More than 1cm movement
+            print(f"  Block moved {pos_change*1000:.1f}mm since detection")
+            print(f"  Fresh position: ({current_pos[0]:.3f}, {current_pos[1]:.3f})")
+        
+        # Pick up the misplaced block (using current position)
         if not planner.pick_up(block):
             print(f"  ✗ Failed to pick up {block_name}")
             continue
