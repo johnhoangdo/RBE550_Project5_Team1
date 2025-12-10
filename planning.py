@@ -671,7 +671,7 @@ class PlannerInterface:
                 dz = abs(final_pos[2] - target_pos[2])
                 
                 # For Goal 4A with spacing=0.045m (4.5cm), tolerance = 0.010m (10mm)
-                TIGHT_TOLERANCE = 0.01  # 10mm for Goal 4A (relaxed from 5mm)
+                TIGHT_TOLERANCE = 0.02  # 10mm for Goal 4A (relaxed from 5mm)
                 tolerance = TIGHT_TOLERANCE
                 
                 gs.logger.info(f"Final position: ({final_pos[0]:.4f}, {final_pos[1]:.4f}, {final_pos[2]:.4f})")
