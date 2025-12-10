@@ -42,7 +42,9 @@ from scenes import (
 
 def check_all_block_positions(blocks_state, spatial_targets, tolerance=0.010):
     """
-    Check if any blocks have been knocked out of their target positions.
+    Check if any PLACED blocks have been knocked out of their target positions.
+    
+    CRITICAL: Only checks blocks that are ON the table (not held, not in spawn area)
     
     Args:
         blocks_state: Dict of block_name -> Genesis block entity
@@ -60,6 +62,12 @@ def check_all_block_positions(blocks_state, spatial_targets, tolerance=0.010):
         
         block = blocks_state[block_name]
         current_pos = block.get_pos()
+        
+        # CRITICAL FIX: Only check blocks that are on the table (Z ~ 0.02)
+        # Skip blocks that haven't been placed yet (still in spawn area, Z ~ 0.15+)
+        # Skip blocks that are being held (Z > 0.10)
+        if current_pos[2] > 0.10:  # Block is in spawn area or being held
+            continue
         
         # Check XY position only (Z doesn't matter for base blocks)
         dx = abs(current_pos[0] - target_pos[0])
