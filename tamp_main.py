@@ -36,6 +36,99 @@ from scenes import (
 )
 
 
+# ============================================================
+# POSITION CHECKING FUNCTIONS (for recovery from collisions)
+# ============================================================
+
+def check_all_block_positions(blocks_state, spatial_targets, tolerance=0.010):
+    """
+    Check if any blocks have been knocked out of their target positions.
+    
+    Args:
+        blocks_state: Dict of block_name -> Genesis block entity
+        spatial_targets: Dict of block_name -> (x, y) target position
+        tolerance: Position tolerance in meters (default 10mm)
+    
+    Returns:
+        List of (block_name, current_pos, target_pos, error) for misplaced blocks
+    """
+    misplaced_blocks = []
+    
+    for block_name, target_pos in spatial_targets.items():
+        if block_name not in blocks_state:
+            continue
+        
+        block = blocks_state[block_name]
+        current_pos = block.get_pos()
+        
+        # Check XY position only (Z doesn't matter for base blocks)
+        dx = abs(current_pos[0] - target_pos[0])
+        dy = abs(current_pos[1] - target_pos[1])
+        
+        if dx > tolerance or dy > tolerance:
+            error = (dx * 1000, dy * 1000)  # Convert to mm
+            misplaced_blocks.append((block_name, current_pos, target_pos, error))
+    
+    return misplaced_blocks
+
+
+def reposition_knocked_blocks(planner, scene, blocks_state, spatial_targets, tolerance=0.010):
+    """
+    Reposition any blocks that have been knocked out of place.
+    
+    This is called between major actions to ensure the grid stays intact.
+    
+    Args:
+        planner: PlannerInterface instance
+        scene: Genesis scene
+        blocks_state: Dict of block_name -> block entity
+        spatial_targets: Dict of block_name -> target position
+        tolerance: Position tolerance (default 10mm)
+    
+    Returns:
+        int: Number of blocks repositioned
+    """
+    misplaced_blocks = check_all_block_positions(blocks_state, spatial_targets, tolerance)
+    
+    if not misplaced_blocks:
+        return 0
+    
+    print("\n" + "="*60)
+    print(f"[RECOVERY] Found {len(misplaced_blocks)} misplaced blocks!")
+    print("="*60)
+    
+    for block_name, current_pos, target_pos, error in misplaced_blocks:
+        print(f"  {block_name}: ({current_pos[0]:.3f}, {current_pos[1]:.3f}) "
+              f"→ ({target_pos[0]:.3f}, {target_pos[1]:.3f}) "
+              f"[error: {error[0]:.1f}mm, {error[1]:.1f}mm]")
+    
+    repositioned_count = 0
+    
+    for block_name, current_pos, target_pos, error in misplaced_blocks:
+        print(f"\n[RECOVERY] Repositioning {block_name}...")
+        
+        block = blocks_state[block_name]
+        
+        # Pick up the misplaced block
+        if not planner.pick_up(block):
+            print(f"  ✗ Failed to pick up {block_name}")
+            continue
+        
+        # Put it down at the correct position
+        target_3d = np.array([target_pos[0], target_pos[1], 0.02])
+        if planner.put_down(target_3d):
+            print(f"  ✓ Successfully repositioned {block_name}")
+            repositioned_count += 1
+        else:
+            print(f"  ✗ Failed to reposition {block_name}")
+    
+    if repositioned_count > 0:
+        print(f"\n[RECOVERY] Repositioned {repositioned_count} blocks")
+        print("="*60)
+    
+    return repositioned_count
+
+
 def execute_primitive(action_tuple, planner, scene, blocks_state):
     """Execute one symbolic action using PlannerInterface primitives."""
     act = action_tuple[0].lower().replace("_", "-")
@@ -290,11 +383,37 @@ def tamp_loop(scene, robot, blocks_state,
                 plan, current_state, goal_predicates, blocks_state
             )
 
-        # Execute plan
-        for action in plan:
+        # Execute plan with intermediate position checking
+        for i, action in enumerate(plan):
             if not execute_primitive(action, planner_interface, scene, blocks_state):
-                print("\n Execution failed, replanning...")
+                print("\n❌ Execution failed, replanning...")
                 break
+            
+            # INTERMEDIATE POSITION CHECK: After every action, check if any blocks got knocked
+            # This is especially important for tight grids where collisions can knock blocks
+            if use_spatial and "spatial" in goal_predicates:
+                # Check every 2 actions (not every single one to save time)
+                if i % 2 == 1 or i == len(plan) - 1:
+                    misplaced = check_all_block_positions(
+                        blocks_state, 
+                        goal_predicates["spatial"], 
+                        tolerance=0.010
+                    )
+                    
+                    if misplaced:
+                        print(f"\n⚠️ [RECOVERY] Detected {len(misplaced)} misplaced blocks after action {i+1}/{len(plan)}")
+                        repositioned = reposition_knocked_blocks(
+                            planner_interface,
+                            scene,
+                            blocks_state,
+                            goal_predicates["spatial"],
+                            tolerance=0.010
+                        )
+                        
+                        if repositioned > 0:
+                            print(f"✓ [RECOVERY] Successfully repositioned {repositioned} blocks")
+                        else:
+                            print(f"⚠️ [RECOVERY] Could not reposition all blocks, continuing...")
         
     print("\n" + "="*60)
     print("✗ FAILED. Goal not achieved.".center(60))
