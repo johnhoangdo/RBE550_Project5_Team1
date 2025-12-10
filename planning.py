@@ -459,7 +459,7 @@ class PlannerInterface:
             qpos_pregrasp[-2:] = 0.04
             
             # Plan collision-free path to pre-grasp
-            path = self.plan_path(qpos_goal=qpos_pregrasp, timeout=5.0, num_waypoints=200)
+            path = self.plan_path(qpos_goal=qpos_pregrasp, timeout=10.0, num_waypoints=300)
             if not path:
                 gs.logger.warning("Failed to plan path to pre-grasp")
                 return False
@@ -586,11 +586,13 @@ class PlannerInterface:
             qpos_preplace[-2:] = 0.01  # Gripper closed (holding object)
             
             # Plan path WITH attached object for collision checking
+            # Use RRTstar for stacking to find straighter, more optimal paths
             path = self.plan_path(
                 qpos_goal=qpos_preplace,
                 attached_object=self.attached_object,
-                timeout=5.0,
-                num_waypoints=200
+                timeout=10.0,
+                num_waypoints=300,
+                planner="RRTstar"  # More optimal paths for tight grids
             )
             
             if not path:
@@ -752,8 +754,8 @@ class PlannerInterface:
                             # Use motion planning for horizontal move
                             path_horizontal = self.plan_path(
                                 qpos_goal=qpos_new_xy_safe,
-                                timeout=3.0,
-                                num_waypoints=100
+                                timeout=8.0,  # Increased from 3.0 for better paths
+                                num_waypoints=200
                             )
                             
                             if path_horizontal:
