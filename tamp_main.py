@@ -40,16 +40,17 @@ from scenes import (
 # POSITION CHECKING FUNCTIONS (for recovery from collisions)
 # ============================================================
 
-def check_all_block_positions(blocks_state, spatial_targets, tolerance=0.010):
+def check_all_block_positions(blocks_state, spatial_targets, tolerance=0.010, placed_blocks=None):
     """
     Check if any PLACED blocks have been knocked out of their target positions.
     
-    CRITICAL: Only checks blocks that are ON the table (not held, not in spawn area)
+    CRITICAL: Only checks blocks that have been explicitly placed by the task plan
     
     Args:
         blocks_state: Dict of block_name -> Genesis block entity
         spatial_targets: Dict of block_name -> (x, y) target position
         tolerance: Position tolerance in meters (default 10mm)
+        placed_blocks: Set of block names that have been placed (if None, checks all)
     
     Returns:
         List of (block_name, current_pos, target_pos, error) for misplaced blocks
@@ -60,13 +61,15 @@ def check_all_block_positions(blocks_state, spatial_targets, tolerance=0.010):
         if block_name not in blocks_state:
             continue
         
+        # CRITICAL: Only check blocks that have been placed by task plan
+        if placed_blocks is not None and block_name not in placed_blocks:
+            continue
+        
         block = blocks_state[block_name]
         current_pos = block.get_pos()
         
-        # CRITICAL FIX: Only check blocks that are on the table (Z ~ 0.02)
-        # Skip blocks that haven't been placed yet (still in spawn area, Z ~ 0.15+)
-        # Skip blocks that are being held (Z > 0.10)
-        if current_pos[2] > 0.10:  # Block is in spawn area or being held
+        # Additional safety: Skip blocks in spawn area or being held
+        if current_pos[2] > 0.10:
             continue
         
         # Check XY position only (Z doesn't matter for base blocks)
@@ -401,21 +404,35 @@ def tamp_loop(scene, robot, blocks_state,
                 plan, current_state, goal_predicates, blocks_state
             )
 
+        # Track which blocks have been placed by the task plan
+        placed_blocks = set()
+
         # Execute plan with intermediate position checking
         for i, action in enumerate(plan):
             if not execute_primitive(action, planner_interface, scene, blocks_state):
                 print("\n❌ Execution failed, replanning...")
                 break
             
-            # INTERMEDIATE POSITION CHECK: After every action, check if any blocks got knocked
-            # This is especially important for tight grids where collisions can knock blocks
+            # Track which blocks have been placed (put-down or stack actions)
+            if action[0] == "put-down" and len(action) > 0:
+                block_name = action[1]
+                if block_name in goal_predicates.get("spatial", {}):
+                    placed_blocks.add(block_name)
+            elif action[0] == "stack" and len(action) > 2:
+                # Bottom block of stack (target) is now placed
+                bottom_block = action[2]
+                if bottom_block in goal_predicates.get("spatial", {}):
+                    placed_blocks.add(bottom_block)
+            
+            # INTERMEDIATE POSITION CHECK: Only check blocks that have been placed
             if use_spatial and "spatial" in goal_predicates:
                 # Check every 2 actions (not every single one to save time)
                 if i % 2 == 1 or i == len(plan) - 1:
                     misplaced = check_all_block_positions(
                         blocks_state, 
                         goal_predicates["spatial"], 
-                        tolerance=0.010
+                        tolerance=0.010,
+                        placed_blocks=placed_blocks  # Only check placed blocks!
                     )
                     
                     if misplaced:
