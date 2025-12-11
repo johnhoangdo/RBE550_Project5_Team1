@@ -35,11 +35,6 @@ from scenes import (
     create_scene_3red_3green
 )
 
-GRASP_OFFSET_HEIGHT_DEFAULT = 0.09
-PLACE_OFFSET_HEIGHT_DEFAULT = 0.08
-
-GRASP_OFFSET_HEIGHT_4 = 0.10
-PLACE_OFFSET_HEIGHT_4 = 0.12  
 
 # ============================================================
 # POSITION CHECKING FUNCTIONS (for recovery from collisions)
@@ -136,17 +131,17 @@ def reposition_knocked_blocks(planner, scene, blocks_state, spatial_targets, tol
             print(f"  Fresh position: ({current_pos[0]:.3f}, {current_pos[1]:.3f})")
         
         # Pick up the misplaced block (using current position)
-        if not planner.pick_up(block,grasp_offset=planner.grasp_offset):
-            print(f"Failed to pick up {block_name}")
+        if not planner.pick_up(block):
+            print(f"  ✗ Failed to pick up {block_name}")
             continue
         
         # Put it down at the correct position
         target_3d = np.array([target_pos[0], target_pos[1], 0.02])
-        if planner.put_down(target_3d,place_offset=planner.place_offset):
-            print(f"Successfully repositioned {block_name}")
+        if planner.put_down(target_3d):
+            print(f"  ✓ Successfully repositioned {block_name}")
             repositioned_count += 1
         else:
-            print(f"Failed to reposition {block_name}")
+            print(f"  ✗ Failed to reposition {block_name}")
     
     if repositioned_count > 0:
         print(f"\n[RECOVERY] Repositioned {repositioned_count} blocks")
@@ -174,12 +169,12 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
                 return False
             
             block = blocks_state[block_name]
-            success = planner.pick_up(block, grasp_offset=planner.grasp_offset)
+            success = planner.pick_up(block)
             
             if success:
-                print(f"Successfully picked up {block_name}")
+                print(f" ✓ Successfully picked up {block_name}")
             else:
-                print(f"Failed to pick up {block_name}")
+                print(f" ✗ Failed to pick up {block_name}")
             
             return success
 
@@ -212,12 +207,12 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
                 pos = held_obj.get_pos()
                 target_pos = np.array([pos[0], pos[1], 0.02])
             
-            success = planner.put_down(target_pos,place_offset=planner.place_offset)
+            success = planner.put_down(target_pos)
             
             if success:
-                print(f"Successfully put down {block_name or 'block'}")
+                print(f"  ✓ Successfully put down {block_name or 'block'}")
             else:
-                print(f"Failed to put down {block_name or 'block'}")
+                print(f"  ✗ Failed to put down {block_name or 'block'}")
             
             return success
 
@@ -239,7 +234,7 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             if held_obj is None:
                 print(f"[WARN] Not holding {block_a_name}, trying to pick it up first...")
                 if block_a_name in blocks_state:
-                    if not planner.pick_up(blocks_state[block_a_name], grasp_offset=planner.grasp_offset):
+                    if not planner.pick_up(blocks_state[block_a_name]):
                         print(f"[ERROR] Failed to pick up {block_a_name}")
                         return False
                 else:
@@ -249,9 +244,9 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             success = planner.stack(block_b)
             
             if success:
-                print(f"Successfully stacked {block_a_name} on {block_b_name}")
+                print(f" ✓ Successfully stacked {block_a_name} on {block_b_name}")
             else:
-                print(f"Failed to stack {block_a_name} on {block_b_name}")
+                print(f" ✗ Failed to stack {block_a_name} on {block_b_name}")
             
             return success
 
@@ -271,9 +266,9 @@ def execute_primitive(action_tuple, planner, scene, blocks_state):
             success = planner.pick_up(block_a)
             
             if success:
-                print(f"Successfully unstacked {block_a_name} from {block_b_name}")
+                print(f"  ✓ Successfully unstacked {block_a_name} from {block_b_name}")
             else:
-                print(f"Failed to unstack {block_a_name}")
+                print(f"  ✗ Failed to unstack {block_a_name}")
             
             return success
 
@@ -360,16 +355,14 @@ def tamp_loop(scene, robot, blocks_state,
               domain_file="blocksworld_domain.pddl",
               max_iterations=10,
               use_spatial=False,
-              planning_timeout=30,
-              grasp_offset=GRASP_OFFSET_HEIGHT_DEFAULT,
-              place_offset=PLACE_OFFSET_HEIGHT_DEFAULT):
+              planning_timeout=30):
     """
     TAMP loop with critical bug fixes:
     1. Uses planner_interface for compute_predicates (holding detection)
     2. Prepends positioning (no consecutive pick-ups)
     """
     
-    planner_interface = PlannerInterface(robot, scene,grasp_offset=grasp_offset, place_offset=place_offset)
+    planner_interface = PlannerInterface(robot, scene)
     iteration = 0
 
     while iteration < max_iterations:
@@ -390,7 +383,7 @@ def tamp_loop(scene, robot, blocks_state,
         
         if goal_met:
             print("\n" + "="*60)
-            print("GOAL ACHIEVED!".center(60))
+            print("✓ GOAL ACHIEVED!".center(60))
             if use_spatial:
                 print("(Including spatial constraints)".center(60))
             print("="*60)
@@ -407,7 +400,7 @@ def tamp_loop(scene, robot, blocks_state,
                            timeout=planning_timeout)
 
         if not plan:
-            print("\nNo plan found. Unable to achieve goal.")
+            print("\n✗ No plan found. Unable to achieve goal.")
             return False
 
         plan = parse_plan_output(plan)
@@ -424,7 +417,7 @@ def tamp_loop(scene, robot, blocks_state,
         # Execute plan with intermediate position checking
         for i, action in enumerate(plan):
             if not execute_primitive(action, planner_interface, scene, blocks_state):
-                print("\nExecution failed, replanning...")
+                print("\n❌ Execution failed, replanning...")
                 break
             
             # Track which blocks have been placed (put-down or stack actions)
@@ -450,7 +443,7 @@ def tamp_loop(scene, robot, blocks_state,
                     )
                     
                     if misplaced:
-                        print(f"\n[RECOVERY] Detected {len(misplaced)} misplaced blocks after action {i+1}/{len(plan)}")
+                        print(f"\n⚠️ [RECOVERY] Detected {len(misplaced)} misplaced blocks after action {i+1}/{len(plan)}")
                         repositioned = reposition_knocked_blocks(
                             planner_interface,
                             scene,
@@ -460,12 +453,12 @@ def tamp_loop(scene, robot, blocks_state,
                         )
                         
                         if repositioned > 0:
-                            print(f"[RECOVERY] Successfully repositioned {repositioned} blocks")
+                            print(f"✓ [RECOVERY] Successfully repositioned {repositioned} blocks")
                         else:
-                            print(f"[RECOVERY] Could not reposition all blocks, continuing...")
+                            print(f"⚠️ [RECOVERY] Could not reposition all blocks, continuing...")
         
     print("\n" + "="*60)
-    print("FAILED. Goal not achieved.".center(60))
+    print("✗ FAILED. Goal not achieved.".center(60))
     print("="*60)
     return False
 
@@ -529,6 +522,10 @@ def main():
         scene, franka, blocks_state = create_scene_6blocks()
         goal_name_str = "six_tower"
         use_spatial = False
+    elif use_goal3_extended:
+        scene, franka, blocks_state = create_scene_10blocks()
+        goal_name_str = "ten_tower"
+        use_spatial = False
     elif use_goal4a:
         scene, franka, blocks_state = create_scene_12_yellow_blocks()
         goal_name_str = "tower_grid"
@@ -541,15 +538,7 @@ def main():
         scene, franka, blocks_state = create_scene_6blocks()
         goal_name_str = "six_tower"
         use_spatial = False
- 
-    # Adjust grasp/place offsets
-    if use_goal4a or use_goal4b:
-        grasp_offset = GRASP_OFFSET_HEIGHT_4
-        place_offset = PLACE_OFFSET_HEIGHT_4
-    else:
-        grasp_offset = GRASP_OFFSET_HEIGHT_DEFAULT
-        place_offset = PLACE_OFFSET_HEIGHT_DEFAULT
-
+    
     goal = get_goal(goal_name_str)
 
     success = tamp_loop(
@@ -559,9 +548,7 @@ def main():
         goal_predicates=goal,
         max_iterations=max_iterations,
         use_spatial=use_spatial,
-        planning_timeout=planning_timeout,
-        grasp_offset=grasp_offset,
-        place_offset=place_offset
+        planning_timeout=planning_timeout
     )
     
     print("\n" + "="*60)
