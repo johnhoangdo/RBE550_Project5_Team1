@@ -103,6 +103,108 @@ def create_scene_6blocks() -> Tuple[Any, Any, Dict[str, Any]]:
 
     return scene, franka, blocks_state
 
+
+def create_scene_10blocks() -> Tuple[Any, Any, Dict[str, Any]]:
+    """
+    Create a 10-block demo scene with blocks closer together for tall tower building.
+    Blocks are spread in a compact workspace but not too far apart.
+    Returns scene, franka_adapter, blocks_state.
+    """
+    scene = _build_base_scene()
+    # Add ground plane
+    plane = scene.add_entity(gs.morphs.Plane())
+
+    # MORE SPREAD OUT LAYOUT - Blocks further apart but still reachable
+    # Workspace: x=[0.30-0.70], y=[-0.25, +0.25]
+    # Each block has more space around it to avoid collisions
+    
+    # Row 1 (back row, x=0.70)
+    posR = _rand_xy((0.70, -0.15, 0.02), noise=0.02)
+    posG = _rand_xy((0.70,  0.00, 0.02), noise=0.02)
+    posB = _rand_xy((0.70,  0.15, 0.02), noise=0.02)
+    
+    # Row 2 (middle-back, x=0.60)
+    posY = _rand_xy((0.60, -0.25, 0.02), noise=0.02)
+    posM = _rand_xy((0.60,  0.00, 0.02), noise=0.02)
+    posC = _rand_xy((0.60,  0.25, 0.02), noise=0.02)
+    
+    # Row 3 (middle-front, x=0.50)
+    posO = _rand_xy((0.50, -0.15, 0.02), noise=0.02)
+    posP = _rand_xy((0.50,  0.15, 0.02), noise=0.02)
+    
+    # Row 4 (front row, x=0.40)
+    posQ = _rand_xy((0.40, -0.08, 0.02), noise=0.02)
+    posS = _rand_xy((0.40,  0.08, 0.02), noise=0.02)
+
+    # Create colored blocks (no explicit quat/orientation)
+    cubeR = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posR),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.0, 0.0)),
+    )
+    cubeG = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posG),
+        surface=gs.options.surfaces.Plastic(color=(0.0, 1.0, 0.0)),
+    )
+    cubeB = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posB),
+        surface=gs.options.surfaces.Plastic(color=(0.0, 0.0, 1.0)),
+    )
+    cubeY = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posY),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 1.0, 0.0)),
+    )
+    cubeM = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posM),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.0, 1.0)),
+    )
+    cubeC = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posC),
+        surface=gs.options.surfaces.Plastic(color=(0.0, 1.0, 1.0)),
+    )
+    cubeO = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posO),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.5, 0.0)),  # Orange
+    )
+    cubeP = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posP),
+        surface=gs.options.surfaces.Plastic(color=(0.0, 0.6, 0.6)),  # Teal
+    )
+    cubeQ = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posQ),
+        surface=gs.options.surfaces.Plastic(color=(0.6, 0.2, 0.6)),  # Purple
+    )
+    cubeS = scene.add_entity(
+        gs.morphs.Box(size=(0.04, 0.04, 0.04), pos=posS),
+        surface=gs.options.surfaces.Plastic(color=(1.0, 0.7, 0.8)),  # Pink
+    )
+
+    # Add robot
+    franka_raw = scene.add_entity(gs.morphs.MJCF(file="xml/franka_emika_panda/panda.xml"))
+    franka = RobotAdapter(franka_raw, scene)
+
+    # Build the scene (sets up physics and visuals)
+    scene.build()
+
+    # Set initial robot joint positions (7 arm joints + 2 gripper fingers)
+    franka.set_qpos(np.array([0.0, -0.5, -0.2, -1.0, 0.0, 1.00, 0.5, 0.02, 0.02]))
+
+    # Lift robot slightly to prevent initial collision weirdness
+    _elevate_robot_base(franka)
+
+    blocks_state: Dict[str, Any] = {
+        "r": cubeR, "g": cubeG, "b": cubeB,
+        "y": cubeY, "m": cubeM, "c": cubeC,
+        "o": cubeO, "p": cubeP, "q": cubeQ, "s": cubeS
+    }
+
+    print("[Scene] Created 10-block scene (spread out layout)")
+    print(f"[Scene] Workspace center: x=0.50m, y=0.0m")
+    print(f"[Scene] Spread: x=[0.40-0.70], y=[-0.25,+0.25]")
+    print(f"[Scene] Min block spacing: ~10-15cm")
+
+    return scene, franka, blocks_state
+
+
 def create_scene_12_yellow_blocks() -> Tuple[Any, Any, Dict[str, Any]]:
     """
     Create scene with 12 identical yellow blocks for Tower configuration (Goal 4A).
