@@ -1040,7 +1040,7 @@ class PlannerInterface:
             ])
             
             # Use put_down with offset from planning config (mode-dependent)
-            return self.put_down(stack_pos, place_offset=planning_config.stack_offset)
+            return self.put_down(stack_pos, place_offset=planning_config.place_offset)
             
         except Exception as e:  
             gs.logger.error(f"Stack failed with exception: {e}")
