@@ -6,6 +6,11 @@ from typing import Any
 from genesis.utils.misc import tensor_to_array
 from robot_adapter import RobotAdapter
 
+# Offsets for grasping/placing
+GRASP_OFFSET_HEIGHT_DEFAULT = 0.09
+PLACE_OFFSET_HEIGHT_DEFAULT = 0.08
+GRASP_OFFSET_HEIGHT_4 = 0.10
+PLACE_OFFSET_HEIGHT_4 = 0.12 
 
 class PlanningConfig:
     """
@@ -39,7 +44,7 @@ class PlanningConfig:
     GOAL3_EXT_PRE_GRASP_HEIGHT = 0.35  # Very high approach
     GOAL3_EXT_PRE_PLACE_HEIGHT = 0.40  # Very high placement approach
     GOAL3_EXT_DESCENT_WAYPOINTS = 150  # Very slow descent
-    GOAL3_EXT_SETTLING_TIME = 500      # Very long settling
+    GOAL3_EXT_SETTLING_TIME = 300      # Very long settling
     
     def __init__(self, mode='goal3'):
         """
@@ -144,12 +149,15 @@ def _ensure_adapter(robot: Any, scene: Any) -> RobotAdapter:
 
 
 class PlannerInterface:
-    def __init__(self, robot: Any, scene: Any):
+    def __init__(self, robot: Any, scene: Any, grasp_offset=GRASP_OFFSET_HEIGHT_DEFAULT, place_offset=PLACE_OFFSET_HEIGHT_DEFAULT):
         # ensure we have a RobotAdapter so the rest of the code can rely on a
         # stable interface (but attribute access is forwarded to the raw robot)
         self.robot = _ensure_adapter(robot, scene)
         self.scene = scene
         self.attached_object = None
+        self.grasp_offset = grasp_offset
+        self.place_offset = place_offset
+        
 
     def diagnose_bounds_violation(self, si, state):
         # print the bounds the current state is violating
@@ -679,7 +687,7 @@ class PlannerInterface:
                 gs.logger.info(f"Tolerance: {tolerance*1000:.1f}mm")
                 
                 if dx > tolerance or dy > tolerance:
-                    gs.logger.error(f"❌ POSITION ERROR EXCEEDS TOLERANCE!")
+                    gs.logger.error(f"   POSITION ERROR EXCEEDS TOLERANCE!")
                     gs.logger.error(f"   Target:  ({target_pos[0]:.4f}, {target_pos[1]:.4f})")
                     gs.logger.error(f"   Actual:  ({final_pos[0]:.4f}, {final_pos[1]:.4f})")
                     gs.logger.error(f"   Error:   ({dx*1000:.2f}mm, {dy*1000:.2f}mm)")
@@ -931,7 +939,7 @@ class PlannerInterface:
             target_pos = target_block.get_pos()
             gs.logger.info(f"Stacking on block at {target_pos}")
             
-            # Calculate where new block's CENTER should be
+            # Calculate where new block's should be
             # target_pos[2] is center of lower block
             # New block center = lower block center + one full block height
             stack_pos = np.array([
@@ -941,7 +949,7 @@ class PlannerInterface:
             ])
             
             # Use put_down with HIGHER offset to prevent slamming
-            return self.put_down(stack_pos, place_offset=0.12)
+            return self.put_down(stack_pos, place_offset=self.place_offset)
             
         except Exception as e:  
             gs.logger.error(f"Stack failed with exception: {e}")
