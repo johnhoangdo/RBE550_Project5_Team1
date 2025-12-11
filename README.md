@@ -3,11 +3,11 @@ source venv/bin/activate   # activate your virtual environment
 python tamp_main.py --goal1  # run Goal 1
 
 To run other goals, replace --goal1 with the option for the goal you want, such as:
-    --goal2 //5-block tower
-    --goal3 //Extra-Credit (6-blocks)
-    --goal3-ext //Extra Credit (10-blocks)
-    --goal4a //yellow blocks
-    --goal4b //red and green blocks in L shapes
+1) --goal2 //5-block tower
+2) --goal3 //Extra-Credit (6-blocks)
+3) --goal3-ext //Extra Credit (10-blocks)
+4) --goal4a //yellow blocks
+5) --goal4b //red and green blocks in L shapes
 
 Installation SetpsSteps to install everything so far: 
 1) Install conda  conda create -y -n rbe550 python=3.11
