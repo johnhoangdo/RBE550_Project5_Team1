@@ -65,6 +65,25 @@ GOAL_SIX_TOWER = {
 }
 
 
+# ============================================================
+# GOAL 3-EXT: Tallest Tower - Ten Blocks
+# ============================================================
+GOAL_TEN_TOWER = {
+    "on": [
+        ("r", "g"),
+        ("b", "r"),
+        ("y", "b"),
+        ("m", "y"),
+        ("c", "m"),
+        ("o", "c"),
+        ("p", "o"),
+        ("q", "p"),
+        ("s", "q"),
+    ],
+    "ontable": ["g"],
+    "clear": ["s"],
+}
+
 
 # ============================================================
 # GOAL 4A-SIMPLE: Two Tower Grid (4 Yellow Blocks) - TEST
@@ -191,6 +210,7 @@ def get_goal(goal_name):
         "two_towers": GOAL_TWO_TOWERS,
         "five_tower": GOAL_FIVE_TOWER,
         "six_tower": GOAL_SIX_TOWER,
+        "ten_tower": GOAL_TEN_TOWER,
         "tower_grid": GOAL_TOWER_GRID,
         "tower_grid_simple": GOAL_TOWER_GRID_SIMPLE,  # NEW: Simplified test
         "adjacent": GOAL_ADJACENT_COLORS,
