@@ -28,7 +28,7 @@ from abstraction import (
 )
 from goals import GOAL_TWO_TOWERS, GOAL_SIX_TOWER, GOAL_FIVE_TOWER, get_goal
 from task_planner import call_planner, parse_plan_output, validate_plan
-from planning import PlannerInterface
+from planning import PlannerInterface, set_planning_mode
 from scenes import (
     create_scene_6blocks,
     create_scene_10blocks,
@@ -509,6 +509,14 @@ def main():
         gs.init(backend=gs.gpu, logging_level='Warning', logger_verbose_time=False)
     else:
         gs.init(backend=gs.cpu, logging_level='Warning', logger_verbose_time=False)
+    
+    # Set planning mode based on goal
+    if use_goal1 or use_goal2:
+        set_planning_mode('default')  # Fast mode for Goals 1-2
+    elif use_goal3_extended:
+        set_planning_mode('goal3_extended')  # Tight tolerances for 10-block tower
+    else:
+        set_planning_mode('goal3')  # Default mode for Goal 3, 4A, 4B
     
     # Scene selection
     if use_goal1:
