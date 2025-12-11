@@ -23,7 +23,7 @@ class PlanningConfig:
         settling_time: Physics settling steps after placement
     """
     
-    # Default configuration (Goals 1-2)
+    # Default configuration (Goals 1-2, 3, 3-ext)
     DEFAULT_PRE_GRASP_HEIGHT = 0.15
     DEFAULT_PRE_PLACE_HEIGHT = 0.15
     DEFAULT_DESCENT_WAYPOINTS = 50
@@ -31,6 +31,8 @@ class PlanningConfig:
     DEFAULT_POSITION_TOLERANCE = 0.010  # 10mm - relaxed
     DEFAULT_MOTION_TIMEOUT = 10.0       # 10s
     DEFAULT_STACK_OFFSET = 0.12         # 12cm release height
+    DEFAULT_GRASP_OFFSET = 0.09         # 9cm - gripper height for pick-up
+    DEFAULT_PLACE_OFFSET = 0.08         # 8cm - gripper height for put-down
     
     # Goal 3 configuration (6-block tower)
     GOAL3_PRE_GRASP_HEIGHT = 0.25      # Higher approach for tall towers
@@ -40,6 +42,8 @@ class PlanningConfig:
     GOAL3_POSITION_TOLERANCE = 0.010   # 10mm - moderate
     GOAL3_MOTION_TIMEOUT = 10.0        # 10s
     GOAL3_STACK_OFFSET = 0.12          # 12cm release height
+    GOAL3_GRASP_OFFSET = 0.09          # 9cm - default
+    GOAL3_PLACE_OFFSET = 0.08          # 8cm - default
     
     # Goal 3 Extended configuration (10+ block towers)
     GOAL3_EXT_PRE_GRASP_HEIGHT = 0.35  # Very high approach
@@ -49,6 +53,19 @@ class PlanningConfig:
     GOAL3_EXT_POSITION_TOLERANCE = 0.005  # 5mm - TIGHT for tall towers!
     GOAL3_EXT_MOTION_TIMEOUT = 15.0    # 15s - more time for optimal paths
     GOAL3_EXT_STACK_OFFSET = 0.15      # 15cm - gentler release
+    GOAL3_EXT_GRASP_OFFSET = 0.09      # 9cm - default
+    GOAL3_EXT_PLACE_OFFSET = 0.08      # 8cm - default
+    
+    # Goal 4 configuration (Spatial grids - 4A and 4B)
+    GOAL4_PRE_GRASP_HEIGHT = 0.25
+    GOAL4_PRE_PLACE_HEIGHT = 0.30
+    GOAL4_DESCENT_WAYPOINTS = 100
+    GOAL4_SETTLING_TIME = 300
+    GOAL4_POSITION_TOLERANCE = 0.010
+    GOAL4_MOTION_TIMEOUT = 10.0
+    GOAL4_STACK_OFFSET = 0.12
+    GOAL4_GRASP_OFFSET = 0.10          # 10cm - HIGHER for Goal 4!
+    GOAL4_PLACE_OFFSET = 0.12          # 12cm - HIGHER for Goal 4!
     
     def __init__(self, mode='goal3'):
         """
@@ -59,13 +76,40 @@ class PlanningConfig:
                 - 'default': Goals 1-2 (fast, low precision)
                 - 'goal3': Goal 3 - 6 blocks (slow, high precision) [DEFAULT]
                 - 'goal3_extended': 10+ blocks (very slow, very high precision)
+                - 'goal4': Goal 4A/4B - Spatial grids (higher grip/release)
         
         Notes:
             - Default mode is 'goal3' to match abstraction.py defaults
             - Switch to 'default' for Goals 1-2 if needed
             - Switch to 'goal3_extended' for 10+ block towers
+            - Switch to 'goal4' for spatial grid goals (4A, 4B)
         """
-        if mode == 'goal3_extended':
+        if mode == 'goal4':
+            self.pre_grasp_height = self.GOAL4_PRE_GRASP_HEIGHT
+            self.pre_place_height = self.GOAL4_PRE_PLACE_HEIGHT
+            self.descent_waypoints = self.GOAL4_DESCENT_WAYPOINTS
+            self.settling_time = self.GOAL4_SETTLING_TIME
+            self.position_tolerance = self.GOAL4_POSITION_TOLERANCE
+            self.motion_timeout = self.GOAL4_MOTION_TIMEOUT
+            self.stack_offset = self.GOAL4_STACK_OFFSET
+            self.grasp_offset = self.GOAL4_GRASP_OFFSET
+            self.place_offset = self.GOAL4_PLACE_OFFSET
+            self.mode = 'goal4'
+            print('\n' + '='*60)
+            print('[Planning] Goal 4 mode (Spatial grids)'.center(60))
+            print('='*60)
+            print(f'  Pre-grasp height:  {self.pre_grasp_height:.2f}m')
+            print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
+            print(f'  Descent waypoints: {self.descent_waypoints}')
+            print(f'  Settling time:     {self.settling_time} steps')
+            print(f'  Position tolerance:{self.position_tolerance*1000:.1f}mm')
+            print(f'  Motion timeout:    {self.motion_timeout:.1f}s')
+            print(f'  Stack offset:      {self.stack_offset*100:.1f}cm')
+            print(f'  Grasp offset:      {self.grasp_offset*100:.1f}cm')
+            print(f'  Place offset:      {self.place_offset*100:.1f}cm')
+            print('='*60 + '\n')
+            
+        elif mode == 'goal3_extended':
             self.pre_grasp_height = self.GOAL3_EXT_PRE_GRASP_HEIGHT
             self.pre_place_height = self.GOAL3_EXT_PRE_PLACE_HEIGHT
             self.descent_waypoints = self.GOAL3_EXT_DESCENT_WAYPOINTS
@@ -73,6 +117,8 @@ class PlanningConfig:
             self.position_tolerance = self.GOAL3_EXT_POSITION_TOLERANCE
             self.motion_timeout = self.GOAL3_EXT_MOTION_TIMEOUT
             self.stack_offset = self.GOAL3_EXT_STACK_OFFSET
+            self.grasp_offset = self.GOAL3_EXT_GRASP_OFFSET
+            self.place_offset = self.GOAL3_EXT_PLACE_OFFSET
             self.mode = 'goal3_extended'
             print('\n' + '='*60)
             print('[Planning] Goal 3 Extended mode (10+ blocks)'.center(60))
@@ -84,6 +130,8 @@ class PlanningConfig:
             print(f'  Position tolerance:{self.position_tolerance*1000:.1f}mm')
             print(f'  Motion timeout:    {self.motion_timeout:.1f}s')
             print(f'  Stack offset:      {self.stack_offset*100:.1f}cm')
+            print(f'  Grasp offset:      {self.grasp_offset*100:.1f}cm')
+            print(f'  Place offset:      {self.place_offset*100:.1f}cm')
             print('='*60 + '\n')
             
         elif mode == 'default':
@@ -94,6 +142,8 @@ class PlanningConfig:
             self.position_tolerance = self.DEFAULT_POSITION_TOLERANCE
             self.motion_timeout = self.DEFAULT_MOTION_TIMEOUT
             self.stack_offset = self.DEFAULT_STACK_OFFSET
+            self.grasp_offset = self.DEFAULT_GRASP_OFFSET
+            self.place_offset = self.DEFAULT_PLACE_OFFSET
             self.mode = 'default'
             print('\n' + '='*60)
             print('[Planning] Default mode (Goals 1-2)'.center(60))
@@ -105,6 +155,8 @@ class PlanningConfig:
             print(f'  Position tolerance:{self.position_tolerance*1000:.1f}mm')
             print(f'  Motion timeout:    {self.motion_timeout:.1f}s')
             print(f'  Stack offset:      {self.stack_offset*100:.1f}cm')
+            print(f'  Grasp offset:      {self.grasp_offset*100:.1f}cm')
+            print(f'  Place offset:      {self.place_offset*100:.1f}cm')
             print('='*60 + '\n')
             
         else:  # 'goal3' - default mode
@@ -115,6 +167,8 @@ class PlanningConfig:
             self.position_tolerance = self.GOAL3_POSITION_TOLERANCE
             self.motion_timeout = self.GOAL3_MOTION_TIMEOUT
             self.stack_offset = self.GOAL3_STACK_OFFSET
+            self.grasp_offset = self.GOAL3_GRASP_OFFSET
+            self.place_offset = self.GOAL3_PLACE_OFFSET
             self.mode = 'goal3'
             print('\n' + '='*60)
             print('[Planning] Goal 3 mode (6 blocks)'.center(60))
@@ -126,6 +180,8 @@ class PlanningConfig:
             print(f'  Position tolerance:{self.position_tolerance*1000:.1f}mm')
             print(f'  Motion timeout:    {self.motion_timeout:.1f}s')
             print(f'  Stack offset:      {self.stack_offset*100:.1f}cm')
+            print(f'  Grasp offset:      {self.grasp_offset*100:.1f}cm')
+            print(f'  Place offset:      {self.place_offset*100:.1f}cm')
             print('='*60 + '\n')
 
 
@@ -444,20 +500,28 @@ class PlannerInterface:
             gs.logger.warning(f"IK failed for position {target_pos}: {e}")
             return None
 
-    def pick_up(self, block, pre_grasp_height=0.25, grasp_offset=0.10):
+    def pick_up(self, block, pre_grasp_height=None, grasp_offset=None):
         """
         Pick up a block from the table or from on top of another block
         
         Args:
             block: Genesis block entity to pick up
             pre_grasp_height: Height above block TOP for approach (meters)
+                            If None, uses planning_config value
             grasp_offset: Distance above block TOP for grasping (meters)
+                        If None, uses planning_config value
                         SMALLER = grab closer to top (lower down)
                         LARGER = grab higher above top
         
         Returns:
             bool: True if successful, False otherwise
         """
+        # Use config values if not specified
+        if pre_grasp_height is None:
+            pre_grasp_height = planning_config.pre_grasp_height
+        if grasp_offset is None:
+            grasp_offset = planning_config.grasp_offset
+        
         try:
             block_pos = block.get_pos()
             gs.logger.info(f"Attempting pick-up at position ({block_pos[0]:.3f}, {block_pos[1]:.3f}, {block_pos[2]:.3f})")
@@ -566,19 +630,27 @@ class PlannerInterface:
             traceback.print_exc()
             return False
 
-    def put_down(self, target_pos, pre_place_height=0.30, place_offset=0.12):
+    def put_down(self, target_pos, pre_place_height=None, place_offset=None):
         """
         Place the currently held object at target position
         
         Args:
             target_pos: np.array [x, y, z] - target CENTER position for block
             pre_place_height: Height above target for approach (meters)
+                            If None, uses planning_config value
             place_offset: Additional height above target CENTER for gripper (meters)
+                        If None, uses planning_config value
                         HIGHER value = release block HIGHER (less slamming)
         
         Returns:
             bool: True if successful, False otherwise
         """
+        # Use config values if not specified
+        if pre_place_height is None:
+            pre_place_height = planning_config.pre_place_height
+        if place_offset is None:
+            place_offset = planning_config.place_offset
+        
         try:
             if self.attached_object is None:
                 gs.logger.warning("No object attached to put down")
