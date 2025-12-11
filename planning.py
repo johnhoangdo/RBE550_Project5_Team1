@@ -6,6 +6,11 @@ from typing import Any
 from genesis.utils.misc import tensor_to_array
 from robot_adapter import RobotAdapter
 
+# Offsets for grasping/placing
+GRASP_OFFSET_HEIGHT_DEFAULT = 0.09
+PLACE_OFFSET_HEIGHT_DEFAULT = 0.08
+GRASP_OFFSET_HEIGHT_4 = 0.10
+PLACE_OFFSET_HEIGHT_4 = 0.12 
 
 class PlanningConfig:
     """
@@ -23,49 +28,23 @@ class PlanningConfig:
         settling_time: Physics settling steps after placement
     """
     
-    # Default configuration (Goals 1-2, 3, 3-ext)
+    # Default configuration (Goals 1-2)
     DEFAULT_PRE_GRASP_HEIGHT = 0.15
     DEFAULT_PRE_PLACE_HEIGHT = 0.15
     DEFAULT_DESCENT_WAYPOINTS = 50
     DEFAULT_SETTLING_TIME = 100
-    DEFAULT_POSITION_TOLERANCE = 0.010  # 10mm - relaxed
-    DEFAULT_MOTION_TIMEOUT = 10.0       # 10s
-    DEFAULT_STACK_OFFSET = 0.12         # 12cm release height
-    DEFAULT_GRASP_OFFSET = 0.09         # 9cm - gripper height for pick-up
-    DEFAULT_PLACE_OFFSET = 0.08         # 8cm - gripper height for put-down
     
     # Goal 3 configuration (6-block tower)
     GOAL3_PRE_GRASP_HEIGHT = 0.25      # Higher approach for tall towers
     GOAL3_PRE_PLACE_HEIGHT = 0.30      # Much higher placement approach
     GOAL3_DESCENT_WAYPOINTS = 100      # Slower, more controlled descent
     GOAL3_SETTLING_TIME = 300          # Longer physics settling
-    GOAL3_POSITION_TOLERANCE = 0.010   # 10mm - moderate
-    GOAL3_MOTION_TIMEOUT = 10.0        # 10s
-    GOAL3_STACK_OFFSET = 0.12          # 12cm release height
-    GOAL3_GRASP_OFFSET = 0.09          # 9cm - default
-    GOAL3_PLACE_OFFSET = 0.08          # 8cm - default
     
     # Goal 3 Extended configuration (10+ block towers)
     GOAL3_EXT_PRE_GRASP_HEIGHT = 0.35  # Very high approach
     GOAL3_EXT_PRE_PLACE_HEIGHT = 0.40  # Very high placement approach
     GOAL3_EXT_DESCENT_WAYPOINTS = 150  # Very slow descent
-    GOAL3_EXT_SETTLING_TIME = 400      # Very long settling (was 500, reduced for speed)
-    GOAL3_EXT_POSITION_TOLERANCE = 0.005  # 5mm - TIGHT for tall towers!
-    GOAL3_EXT_MOTION_TIMEOUT = 15.0    # 15s - more time for optimal paths
-    GOAL3_EXT_STACK_OFFSET = 0.15      # 15cm - gentler release
-    GOAL3_EXT_GRASP_OFFSET = 0.09      # 9cm - default
-    GOAL3_EXT_PLACE_OFFSET = 0.08      # 8cm - default
-    
-    # Goal 4 configuration (Spatial grids - 4A and 4B)
-    GOAL4_PRE_GRASP_HEIGHT = 0.25
-    GOAL4_PRE_PLACE_HEIGHT = 0.30
-    GOAL4_DESCENT_WAYPOINTS = 100
-    GOAL4_SETTLING_TIME = 300
-    GOAL4_POSITION_TOLERANCE = 0.010
-    GOAL4_MOTION_TIMEOUT = 10.0
-    GOAL4_STACK_OFFSET = 0.12
-    GOAL4_GRASP_OFFSET = 0.10          # 10cm - HIGHER for Goal 4!
-    GOAL4_PLACE_OFFSET = 0.12          # 12cm - HIGHER for Goal 4!
+    GOAL3_EXT_SETTLING_TIME = 300      # Very long settling
     
     def __init__(self, mode='goal3'):
         """
@@ -76,49 +55,17 @@ class PlanningConfig:
                 - 'default': Goals 1-2 (fast, low precision)
                 - 'goal3': Goal 3 - 6 blocks (slow, high precision) [DEFAULT]
                 - 'goal3_extended': 10+ blocks (very slow, very high precision)
-                - 'goal4': Goal 4A/4B - Spatial grids (higher grip/release)
         
         Notes:
             - Default mode is 'goal3' to match abstraction.py defaults
             - Switch to 'default' for Goals 1-2 if needed
             - Switch to 'goal3_extended' for 10+ block towers
-            - Switch to 'goal4' for spatial grid goals (4A, 4B)
         """
-        if mode == 'goal4':
-            self.pre_grasp_height = self.GOAL4_PRE_GRASP_HEIGHT
-            self.pre_place_height = self.GOAL4_PRE_PLACE_HEIGHT
-            self.descent_waypoints = self.GOAL4_DESCENT_WAYPOINTS
-            self.settling_time = self.GOAL4_SETTLING_TIME
-            self.position_tolerance = self.GOAL4_POSITION_TOLERANCE
-            self.motion_timeout = self.GOAL4_MOTION_TIMEOUT
-            self.stack_offset = self.GOAL4_STACK_OFFSET
-            self.grasp_offset = self.GOAL4_GRASP_OFFSET
-            self.place_offset = self.GOAL4_PLACE_OFFSET
-            self.mode = 'goal4'
-            print('\n' + '='*60)
-            print('[Planning] Goal 4 mode (Spatial grids)'.center(60))
-            print('='*60)
-            print(f'  Pre-grasp height:  {self.pre_grasp_height:.2f}m')
-            print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
-            print(f'  Descent waypoints: {self.descent_waypoints}')
-            print(f'  Settling time:     {self.settling_time} steps')
-            print(f'  Position tolerance:{self.position_tolerance*1000:.1f}mm')
-            print(f'  Motion timeout:    {self.motion_timeout:.1f}s')
-            print(f'  Stack offset:      {self.stack_offset*100:.1f}cm')
-            print(f'  Grasp offset:      {self.grasp_offset*100:.1f}cm')
-            print(f'  Place offset:      {self.place_offset*100:.1f}cm')
-            print('='*60 + '\n')
-            
-        elif mode == 'goal3_extended':
+        if mode == 'goal3_extended':
             self.pre_grasp_height = self.GOAL3_EXT_PRE_GRASP_HEIGHT
             self.pre_place_height = self.GOAL3_EXT_PRE_PLACE_HEIGHT
             self.descent_waypoints = self.GOAL3_EXT_DESCENT_WAYPOINTS
             self.settling_time = self.GOAL3_EXT_SETTLING_TIME
-            self.position_tolerance = self.GOAL3_EXT_POSITION_TOLERANCE
-            self.motion_timeout = self.GOAL3_EXT_MOTION_TIMEOUT
-            self.stack_offset = self.GOAL3_EXT_STACK_OFFSET
-            self.grasp_offset = self.GOAL3_EXT_GRASP_OFFSET
-            self.place_offset = self.GOAL3_EXT_PLACE_OFFSET
             self.mode = 'goal3_extended'
             print('\n' + '='*60)
             print('[Planning] Goal 3 Extended mode (10+ blocks)'.center(60))
@@ -127,11 +74,6 @@ class PlanningConfig:
             print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
             print(f'  Descent waypoints: {self.descent_waypoints}')
             print(f'  Settling time:     {self.settling_time} steps')
-            print(f'  Position tolerance:{self.position_tolerance*1000:.1f}mm')
-            print(f'  Motion timeout:    {self.motion_timeout:.1f}s')
-            print(f'  Stack offset:      {self.stack_offset*100:.1f}cm')
-            print(f'  Grasp offset:      {self.grasp_offset*100:.1f}cm')
-            print(f'  Place offset:      {self.place_offset*100:.1f}cm')
             print('='*60 + '\n')
             
         elif mode == 'default':
@@ -139,11 +81,6 @@ class PlanningConfig:
             self.pre_place_height = self.DEFAULT_PRE_PLACE_HEIGHT
             self.descent_waypoints = self.DEFAULT_DESCENT_WAYPOINTS
             self.settling_time = self.DEFAULT_SETTLING_TIME
-            self.position_tolerance = self.DEFAULT_POSITION_TOLERANCE
-            self.motion_timeout = self.DEFAULT_MOTION_TIMEOUT
-            self.stack_offset = self.DEFAULT_STACK_OFFSET
-            self.grasp_offset = self.DEFAULT_GRASP_OFFSET
-            self.place_offset = self.DEFAULT_PLACE_OFFSET
             self.mode = 'default'
             print('\n' + '='*60)
             print('[Planning] Default mode (Goals 1-2)'.center(60))
@@ -152,11 +89,6 @@ class PlanningConfig:
             print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
             print(f'  Descent waypoints: {self.descent_waypoints}')
             print(f'  Settling time:     {self.settling_time} steps')
-            print(f'  Position tolerance:{self.position_tolerance*1000:.1f}mm')
-            print(f'  Motion timeout:    {self.motion_timeout:.1f}s')
-            print(f'  Stack offset:      {self.stack_offset*100:.1f}cm')
-            print(f'  Grasp offset:      {self.grasp_offset*100:.1f}cm')
-            print(f'  Place offset:      {self.place_offset*100:.1f}cm')
             print('='*60 + '\n')
             
         else:  # 'goal3' - default mode
@@ -164,11 +96,6 @@ class PlanningConfig:
             self.pre_place_height = self.GOAL3_PRE_PLACE_HEIGHT
             self.descent_waypoints = self.GOAL3_DESCENT_WAYPOINTS
             self.settling_time = self.GOAL3_SETTLING_TIME
-            self.position_tolerance = self.GOAL3_POSITION_TOLERANCE
-            self.motion_timeout = self.GOAL3_MOTION_TIMEOUT
-            self.stack_offset = self.GOAL3_STACK_OFFSET
-            self.grasp_offset = self.GOAL3_GRASP_OFFSET
-            self.place_offset = self.GOAL3_PLACE_OFFSET
             self.mode = 'goal3'
             print('\n' + '='*60)
             print('[Planning] Goal 3 mode (6 blocks)'.center(60))
@@ -177,11 +104,6 @@ class PlanningConfig:
             print(f'  Pre-place height:  {self.pre_place_height:.2f}m')
             print(f'  Descent waypoints: {self.descent_waypoints}')
             print(f'  Settling time:     {self.settling_time} steps')
-            print(f'  Position tolerance:{self.position_tolerance*1000:.1f}mm')
-            print(f'  Motion timeout:    {self.motion_timeout:.1f}s')
-            print(f'  Stack offset:      {self.stack_offset*100:.1f}cm')
-            print(f'  Grasp offset:      {self.grasp_offset*100:.1f}cm')
-            print(f'  Place offset:      {self.place_offset*100:.1f}cm')
             print('='*60 + '\n')
 
 
@@ -227,12 +149,15 @@ def _ensure_adapter(robot: Any, scene: Any) -> RobotAdapter:
 
 
 class PlannerInterface:
-    def __init__(self, robot: Any, scene: Any):
+    def __init__(self, robot: Any, scene: Any, grasp_offset=GRASP_OFFSET_HEIGHT_DEFAULT, place_offset=PLACE_OFFSET_HEIGHT_DEFAULT):
         # ensure we have a RobotAdapter so the rest of the code can rely on a
         # stable interface (but attribute access is forwarded to the raw robot)
         self.robot = _ensure_adapter(robot, scene)
         self.scene = scene
         self.attached_object = None
+        self.grasp_offset = grasp_offset
+        self.place_offset = place_offset
+        
 
     def diagnose_bounds_violation(self, si, state):
         # print the bounds the current state is violating
@@ -500,28 +425,20 @@ class PlannerInterface:
             gs.logger.warning(f"IK failed for position {target_pos}: {e}")
             return None
 
-    def pick_up(self, block, pre_grasp_height=None, grasp_offset=None):
+    def pick_up(self, block, pre_grasp_height=0.25, grasp_offset=0.10):
         """
         Pick up a block from the table or from on top of another block
         
         Args:
             block: Genesis block entity to pick up
             pre_grasp_height: Height above block TOP for approach (meters)
-                            If None, uses planning_config value
             grasp_offset: Distance above block TOP for grasping (meters)
-                        If None, uses planning_config value
                         SMALLER = grab closer to top (lower down)
                         LARGER = grab higher above top
         
         Returns:
             bool: True if successful, False otherwise
         """
-        # Use config values if not specified
-        if pre_grasp_height is None:
-            pre_grasp_height = planning_config.pre_grasp_height
-        if grasp_offset is None:
-            grasp_offset = planning_config.grasp_offset
-        
         try:
             block_pos = block.get_pos()
             gs.logger.info(f"Attempting pick-up at position ({block_pos[0]:.3f}, {block_pos[1]:.3f}, {block_pos[2]:.3f})")
@@ -630,27 +547,19 @@ class PlannerInterface:
             traceback.print_exc()
             return False
 
-    def put_down(self, target_pos, pre_place_height=None, place_offset=None):
+    def put_down(self, target_pos, pre_place_height=0.30, place_offset=0.12):
         """
         Place the currently held object at target position
         
         Args:
             target_pos: np.array [x, y, z] - target CENTER position for block
             pre_place_height: Height above target for approach (meters)
-                            If None, uses planning_config value
             place_offset: Additional height above target CENTER for gripper (meters)
-                        If None, uses planning_config value
                         HIGHER value = release block HIGHER (less slamming)
         
         Returns:
             bool: True if successful, False otherwise
         """
-        # Use config values if not specified
-        if pre_place_height is None:
-            pre_place_height = planning_config.pre_place_height
-        if place_offset is None:
-            place_offset = planning_config.place_offset
-        
         try:
             if self.attached_object is None:
                 gs.logger.warning("No object attached to put down")
@@ -686,11 +595,10 @@ class PlannerInterface:
             
             # Plan path WITH attached object for collision checking
             # Use RRTstar for stacking to find straighter, more optimal paths
-            # Timeout from planning config (mode-dependent)
             path = self.plan_path(
                 qpos_goal=qpos_preplace,
                 attached_object=self.attached_object,
-                timeout=planning_config.motion_timeout,
+                timeout=10.0,
                 num_waypoints=300,
                 planner="RRTstar"  # More optimal paths for tight grids
             )
@@ -758,9 +666,9 @@ class PlannerInterface:
             # 5. Let physics settle FIRST (CRITICAL - before retraction!)
             gs.logger.info("="*60)
             gs.logger.info(f"PUT-DOWN VERIFICATION - Target: ({target_pos[0]:.4f}, {target_pos[1]:.4f}, {target_pos[2]:.4f})")
-            gs.logger.info(f"Settling physics ({planning_config.settling_time} steps)...")
+            gs.logger.info("Settling physics (200 steps for tight spacing)...")
             
-            for _ in range(planning_config.settling_time):
+            for _ in range(200):  # Reduced from 500 for faster execution
                 self.scene.step()
             
             # 6. VERIFY POSITION (before detaching/retracting!)
@@ -770,15 +678,16 @@ class PlannerInterface:
                 dy = abs(final_pos[1] - target_pos[1])
                 dz = abs(final_pos[2] - target_pos[2])
                 
-                # Use tolerance from planning config (mode-dependent)
-                tolerance = planning_config.position_tolerance
+                # For Goal 4A with spacing=0.045m (4.5cm), tolerance = 0.010m (10mm)
+                TIGHT_TOLERANCE = 0.02  # 10mm for Goal 4A (relaxed from 5mm)
+                tolerance = TIGHT_TOLERANCE
                 
                 gs.logger.info(f"Final position: ({final_pos[0]:.4f}, {final_pos[1]:.4f}, {final_pos[2]:.4f})")
                 gs.logger.info(f"Position error: dx={dx*1000:.2f}mm, dy={dy*1000:.2f}mm, dz={dz*1000:.2f}mm")
                 gs.logger.info(f"Tolerance: {tolerance*1000:.1f}mm")
                 
                 if dx > tolerance or dy > tolerance:
-                    gs.logger.error(f"❌ POSITION ERROR EXCEEDS TOLERANCE!")
+                    gs.logger.error(f"   POSITION ERROR EXCEEDS TOLERANCE!")
                     gs.logger.error(f"   Target:  ({target_pos[0]:.4f}, {target_pos[1]:.4f})")
                     gs.logger.error(f"   Actual:  ({final_pos[0]:.4f}, {final_pos[1]:.4f})")
                     gs.logger.error(f"   Error:   ({dx*1000:.2f}mm, {dy*1000:.2f}mm)")
@@ -794,15 +703,14 @@ class PlannerInterface:
                     gs.logger.info(f"Re-centering gripper above block at ({current_block_pos[0]:.4f}, {current_block_pos[1]:.4f})")
                     
                     # Calculate IK for position directly above block's current location
-                    # Use GRASP height (not place height!) - same as pick_up uses
+                    # Use same gripper height as original placement: center + half_block + offset
                     BLOCK_HEIGHT = 0.04
-                    block_top_z = current_block_pos[2] + BLOCK_HEIGHT/2
-                    regrasp_height = block_top_z + planning_config.grasp_offset  # Use grasp_offset!
+                    regrasp_height = current_block_pos[2] + BLOCK_HEIGHT/2 + place_offset
                     
                     regrasp_target = np.array([
                         current_block_pos[0],
                         current_block_pos[1], 
-                        regrasp_height  # Proper grasp height for picking up
+                        regrasp_height  # Same height as original placement
                     ])
                     
                     # Plan path to re-center above block
@@ -817,27 +725,10 @@ class PlannerInterface:
                         
                         # Step 1: Lift straight up FIRST to clear any obstacles
                         gs.logger.info("  Step 1/3: Lifting to safe height...")
-                        
-                        # Use ABSOLUTE safe height to clear tall towers
-                        # For Goal 3-ext (10 blocks = 40cm), need at least 50cm
-                        SAFE_HEIGHT_Z = 0.50  # 50cm - clears any tower up to 10 blocks
-                        
-                        safe_pos = np.array([
-                            current_block_pos[0],
-                            current_block_pos[1],
-                            SAFE_HEIGHT_Z
-                        ])
-                        
-                        qpos_safe_height = self.robot.inverse_kinematics(
-                            link=self.robot.get_link("hand"),
-                            pos=safe_pos,
-                            quat=np.array([0, 1, 0, 0])
-                        )
-                        
-                        if qpos_safe_height is None:
-                            gs.logger.error("Failed to plan safe height position!")
-                            qpos_safe_height = qpos_preplace  # Fallback
-                        
+                        if hasattr(qpos_preplace, 'clone'):
+                            qpos_safe_height = qpos_preplace.clone()
+                        else:
+                            qpos_safe_height = qpos_preplace.copy()
                         qpos_safe_height[-2:] = 0.04  # Keep open during lift
                         
                         for i in range(50):
@@ -849,10 +740,15 @@ class PlannerInterface:
                         
                         # Step 2: Plan path to new XY position at safe height
                         gs.logger.info("  Step 2/3: Moving to new XY position at safe height...")
+                        # Calculate position at safe height above new target
+                        current_block_pos = placed_block.get_pos()
+                        BLOCK_HEIGHT = 0.04
+                        safe_height_above_new = current_block_pos[2] + BLOCK_HEIGHT/2 + place_offset + pre_place_height
+                        
                         new_xy_safe_pos = np.array([
                             current_block_pos[0],
                             current_block_pos[1],
-                            SAFE_HEIGHT_Z  # Same safe height
+                            safe_height_above_new
                         ])
                         
                         qpos_new_xy_safe = self.robot.inverse_kinematics(
@@ -1043,7 +939,7 @@ class PlannerInterface:
             target_pos = target_block.get_pos()
             gs.logger.info(f"Stacking on block at {target_pos}")
             
-            # Calculate where new block's CENTER should be
+            # Calculate where new block's should be
             # target_pos[2] is center of lower block
             # New block center = lower block center + one full block height
             stack_pos = np.array([
@@ -1052,8 +948,8 @@ class PlannerInterface:
                 target_pos[2] + stack_height  # One block height above center
             ])
             
-            # Use put_down with offset from planning config (mode-dependent)
-            return self.put_down(stack_pos, place_offset=planning_config.stack_offset)
+            # Use put_down with HIGHER offset to prevent slamming
+            return self.put_down(stack_pos, place_offset=self.place_offset)
             
         except Exception as e:  
             gs.logger.error(f"Stack failed with exception: {e}")
