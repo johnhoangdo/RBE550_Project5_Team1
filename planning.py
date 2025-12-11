@@ -35,13 +35,13 @@ class PlanningConfig:
     DEFAULT_SETTLING_TIME = 100
     
     # Goal 3 configuration (6-block tower)
-    GOAL3_PRE_GRASP_HEIGHT = 0.25      # Higher approach for tall towers
+    GOAL3_PRE_GRASP_HEIGHT = 0.30      # Higher approach for tall towers
     GOAL3_PRE_PLACE_HEIGHT = 0.30      # Much higher placement approach
     GOAL3_DESCENT_WAYPOINTS = 100      # Slower, more controlled descent
     GOAL3_SETTLING_TIME = 300          # Longer physics settling
     
     # Goal 3 Extended configuration (10+ block towers)
-    GOAL3_EXT_PRE_GRASP_HEIGHT = 0.35  # Very high approach
+    GOAL3_EXT_PRE_GRASP_HEIGHT = 0.40  # Very high approach
     GOAL3_EXT_PRE_PLACE_HEIGHT = 0.40  # Very high placement approach
     GOAL3_EXT_DESCENT_WAYPOINTS = 150  # Very slow descent
     GOAL3_EXT_SETTLING_TIME = 300      # Very long settling
