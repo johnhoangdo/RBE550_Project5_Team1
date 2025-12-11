@@ -515,8 +515,10 @@ def main():
         set_planning_mode('default')  # Fast mode for Goals 1-2
     elif use_goal3_extended:
         set_planning_mode('goal3_extended')  # Tight tolerances for 10-block tower
+    elif use_goal4a or use_goal4b:
+        set_planning_mode('goal4')  # Higher grip/release for spatial grids
     else:
-        set_planning_mode('goal3')  # Default mode for Goal 3, 4A, 4B
+        set_planning_mode('goal3')  # Default mode for Goal 3
     
     # Scene selection
     if use_goal1:
