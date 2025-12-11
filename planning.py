@@ -794,14 +794,15 @@ class PlannerInterface:
                     gs.logger.info(f"Re-centering gripper above block at ({current_block_pos[0]:.4f}, {current_block_pos[1]:.4f})")
                     
                     # Calculate IK for position directly above block's current location
-                    # Use same gripper height as original placement: center + half_block + offset
+                    # Use GRASP height (not place height!) - same as pick_up uses
                     BLOCK_HEIGHT = 0.04
-                    regrasp_height = current_block_pos[2] + BLOCK_HEIGHT/2 + place_offset
+                    block_top_z = current_block_pos[2] + BLOCK_HEIGHT/2
+                    regrasp_height = block_top_z + planning_config.grasp_offset  # Use grasp_offset!
                     
                     regrasp_target = np.array([
                         current_block_pos[0],
                         current_block_pos[1], 
-                        regrasp_height  # Same height as original placement
+                        regrasp_height  # Proper grasp height for picking up
                     ])
                     
                     # Plan path to re-center above block
@@ -816,10 +817,27 @@ class PlannerInterface:
                         
                         # Step 1: Lift straight up FIRST to clear any obstacles
                         gs.logger.info("  Step 1/3: Lifting to safe height...")
-                        if hasattr(qpos_preplace, 'clone'):
-                            qpos_safe_height = qpos_preplace.clone()
-                        else:
-                            qpos_safe_height = qpos_preplace.copy()
+                        
+                        # Use ABSOLUTE safe height to clear tall towers
+                        # For Goal 3-ext (10 blocks = 40cm), need at least 50cm
+                        SAFE_HEIGHT_Z = 0.50  # 50cm - clears any tower up to 10 blocks
+                        
+                        safe_pos = np.array([
+                            current_block_pos[0],
+                            current_block_pos[1],
+                            SAFE_HEIGHT_Z
+                        ])
+                        
+                        qpos_safe_height = self.robot.inverse_kinematics(
+                            link=self.robot.get_link("hand"),
+                            pos=safe_pos,
+                            quat=np.array([0, 1, 0, 0])
+                        )
+                        
+                        if qpos_safe_height is None:
+                            gs.logger.error("Failed to plan safe height position!")
+                            qpos_safe_height = qpos_preplace  # Fallback
+                        
                         qpos_safe_height[-2:] = 0.04  # Keep open during lift
                         
                         for i in range(50):
@@ -831,15 +849,10 @@ class PlannerInterface:
                         
                         # Step 2: Plan path to new XY position at safe height
                         gs.logger.info("  Step 2/3: Moving to new XY position at safe height...")
-                        # Calculate position at safe height above new target
-                        current_block_pos = placed_block.get_pos()
-                        BLOCK_HEIGHT = 0.04
-                        safe_height_above_new = current_block_pos[2] + BLOCK_HEIGHT/2 + place_offset + pre_place_height
-                        
                         new_xy_safe_pos = np.array([
                             current_block_pos[0],
                             current_block_pos[1],
-                            safe_height_above_new
+                            SAFE_HEIGHT_Z  # Same safe height
                         ])
                         
                         qpos_new_xy_safe = self.robot.inverse_kinematics(
@@ -1040,7 +1053,7 @@ class PlannerInterface:
             ])
             
             # Use put_down with offset from planning config (mode-dependent)
-            return self.put_down(stack_pos, place_offset=planning_config.place_offset)
+            return self.put_down(stack_pos, place_offset=planning_config.stack_offset)
             
         except Exception as e:  
             gs.logger.error(f"Stack failed with exception: {e}")
