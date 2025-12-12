@@ -51,16 +51,15 @@ To run other goals, replace --goal1 with the option for the goal you want, such 
 
 # Project Structure
 project5/
-
-├── abstraction.py          # Symbolic state abstraction (PDDL predicates)
-├── goals.py                # Goal definitions (1-4)
-├── task_planner.py         # Pyperplan interface (A* search)
-├── planning.py             # Motion primitives & OMPL integration
-├── tamp_main.py            # Main TAMP loop & execution
-├── scenes.py               # Genesis scene setup
-├── robot_adapter.py        # Robot control wrapper
-├── demo.py                 # Genesis installation test
-└── blocksworld_domain.pddl # PDDL domain file
+- abstraction.py          # Symbolic state abstraction (PDDL predicates)
+- goals.py                # Goal definitions (1-4)
+- task_planner.py         # Pyperplan interface (A* search)
+- planning.py             # Motion primitives & OMPL integration
+- tamp_main.py            # Main TAMP loop & execution
+- scenes.py               # Genesis scene setup
+- robot_adapter.py        # Robot control wrapper
+- demo.py                 # Genesis installation test
+- blocksworld_domain.pddl # PDDL domain file
 
 # Reference: 
 Genesis Simulator: https://genesis-world.readthedocs.io
