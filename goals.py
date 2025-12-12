@@ -1,17 +1,6 @@
 """
 Goal configurations for Project 5: Building the Two Towers (TAMP)
 
-We've got 6 blocks to work with: r (red), g (green), b (blue), 
-y (yellow), m (magenta), c (cyan)
-
-Each goal is just a Python dict that matches how we set up predicates 
-in abstraction.py:
-{
-  "on": [("top_block", "bottom_block"), ...],     # what's stacked on what
-  "ontable": ["block_name", ...],                  # what's sitting on the table
-  "clear": ["block_name", ...]                     # what has nothing on top
-}
-
 Quick note: We usually don't bother including "handempty" in the goal 
 since the gripper should obviously be empty when we're done.
 
@@ -96,14 +85,13 @@ GOAL_TOWER_GRID_SIMPLE = {
     ],
     "ontable": ["y3", "y4"],
     "clear": ["y1", "y2"],
-    # Spatial constraints added dynamically
+    # Spatial constraints added
 }
 
 
 # ============================================================
 # GOAL 4A: Tower Grid Configuration (12 Yellow Blocks)
 # ============================================================
-# Import will happen at runtime to avoid circular dependency
 def _get_grid_positions():
     """Lazy import to get grid positions"""
     try:
@@ -152,15 +140,9 @@ GOAL_TOWER_GRID = {
 # GOAL 4B: Adjacent Configuration (3 Red + 3 Green)
 # ============================================================
 # Goal 4B: Adjacent Configuration
-# 
-# Create towers in 2×2 grid with mixed heights and colors:
-# - Two red towers (one height-2, one height-1)
-# - Two green towers (one height-2, one height-1)
-# 
 # Grid layout (rows × cols):
 # [R(2)]  [G(2)]
 # [R(1)]  [G(1)]
-# 
 # Where R/G = color, (N) = height
 def _get_2x2_positions():
     """Lazy import to get 2×2 grid positions"""
@@ -168,7 +150,7 @@ def _get_2x2_positions():
         from abstraction import calculate_2x2_grid_positions
         return calculate_2x2_grid_positions(
             center=(0.40, 0.0),  # Move back to clear spawn area
-            spacing=0.045  # Reduced from 0.15 to 0.10 (closer together)
+            spacing=0.045  # Beofore 0.15,0.10
         )
     except ImportError:
         # Fallback - also moved back
