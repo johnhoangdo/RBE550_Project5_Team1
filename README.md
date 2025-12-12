@@ -4,11 +4,12 @@ Task and Motion Planning system for robotic block manipulation using Genesis sim
 
 Authors
 
-Luis Alzamora
-John Hoang Do
-Josh Ethan Nirmal
+- Luis Alzamora
+- John Hoang Do
+- Josh Ethan Nirmal
 
 Course: RBE 550 Motion Planning, Fall 2025
+
 Institution: Worcester Polytechnic Institute
 
 # Pre-requisite:
