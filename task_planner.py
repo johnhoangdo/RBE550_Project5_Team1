@@ -123,7 +123,7 @@ def call_planner(domain_file: str, problem_file: str,
     Call task planner and return list of actions.
     
     Strategy:
-        1. Try pyperplan library API (fastest)
+        1. Try pyperplan library API
         2. Try pyperplan CLI
         3. Check for .soln file
     
@@ -140,7 +140,7 @@ def call_planner(domain_file: str, problem_file: str,
     if use_pyperplan:
         try:
             if VERBOSE:
-                print("[task_planner] Attempting to use pyperplan library...")
+                print("[task_planner] Attempting to use pyperplan library")
             
             import pyperplan
             from pyperplan.pddl.parser import Parser
@@ -167,18 +167,18 @@ def call_planner(domain_file: str, problem_file: str,
         
         except ImportError:
             if VERBOSE:
-                print("[task_planner] Pyperplan not installed, trying CLI...")
+                print("[task_planner] Pyperplan not installed, trying CLI")
         except Exception as e:
             if VERBOSE:
                 print(f"[task_planner] Pyperplan library failed: {e}")
     
-    # Try pyperplan CLI
+    
     if use_pyperplan and plan is None:
         try:
             if VERBOSE:
-                print("[task_planner] Attempting pyperplan CLI...")
+                print("[task_planner] Attempting pyperplan CLI")
             
-            # Use A* search with hFF heuristic (much faster than default BFS)
+            # Use A* search with hFF heuristic 
             cmd = f"pyperplan -s astar -H hff {domain_file} {problem_file}"
             
             try:
@@ -266,10 +266,8 @@ def parse_plan_output(plan: List) -> List[Tuple]:
             normalized.append(tuple(step))
         elif isinstance(step, str):
             s = step.strip()
-            # Remove parens if present
             if s.startswith("(") and s.endswith(")"):
                 s = s[1:-1].strip()
-            # Split on whitespace and commas
             parts = s.replace(",", " ").split()
             if not parts:
                 continue
@@ -282,11 +280,9 @@ def parse_plan_output(plan: List) -> List[Tuple]:
     
     return normalized
 
-
 def normalize_action_names(plan: List[Tuple], 
                            to_format: str = "hyphen") -> List[Tuple]:
     """
-    Normalize action names to consistent format.
     to_format can be "hyphen" (pick-up) or "underscore" (pick_up)
     """
     normalized = []
