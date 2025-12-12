@@ -51,6 +51,7 @@ To run other goals, replace --goal1 with the option for the goal you want, such 
 
 # Project Structure
 project5/
+
 ├── abstraction.py          # Symbolic state abstraction (PDDL predicates)
 ├── goals.py                # Goal definitions (1-4)
 ├── task_planner.py         # Pyperplan interface (A* search)
