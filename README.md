@@ -62,11 +62,11 @@ project5/
 - blocksworld_domain.pddl # PDDL domain file
 
 # Reference: 
-Genesis Simulator: https://genesis-world.readthedocs.io
-OMPL: https://ompl.kavrakilab.org
-Pyperplan: https://github.com/aibasel/pyperplan
-https://www.youtube.com/watch?v=iEE3HqHF34o (Video is for windows install but can be helpful for linux for reference)
-https://www.youtube.com/watch?v=RBZ16oUv5A0
+- Genesis Simulator: https://genesis-world.readthedocs.io
+- OMPL: https://ompl.kavrakilab.org
+- Pyperplan: https://github.com/aibasel/pyperplan
+- https://www.youtube.com/watch?v=iEE3HqHF34o (Video is for windows install but can be helpful for linux for reference)
+- https://www.youtube.com/watch?v=RBZ16oUv5A0
 
 CPU vs. GPU: The following steps can be done to check if your computer has GPU and can be used instead of relying on CPU
 1) lspci | grep -i nvidia
